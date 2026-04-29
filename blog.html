@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#f8f5ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='4' width='24' height='24' rx='3' fill='%23faf8f3' stroke='%232a2520' stroke-width='1.4'/><line x1='8' y1='9' x2='24' y2='25' stroke='%232a2520' stroke-width='1.6' stroke-linecap='round'/></svg>">
 <title>Paper Cuts — A DSA Problem Worth Thinking About</title>
 <meta name="description" content="A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions about planar subdivision, PSLG, and DCEL.">
 <meta name="author" content="@omkar_builds">
@@ -221,6 +222,12 @@
     line-height: 1.6;
     margin: 1.2rem 0;
     -webkit-overflow-scrolling: touch;
+    border: 1px solid transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    pre {
+      border-color: rgba(236,230,219,0.18);
+    }
   }
   pre code {
     background: transparent;
@@ -240,6 +247,12 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: clamp(0.9rem, 2.5vw, 1.5rem);
+  }
+  @media (prefers-color-scheme: dark) {
+    .diagram-wrap {
+      border-color: rgba(236,230,219,0.22);
+      box-shadow: 0 0 0 1px rgba(236,230,219,0.06), 0 12px 32px -16px rgba(0,0,0,0.6);
+    }
   }
   .diagram-wrap svg {
     max-width: 100%;

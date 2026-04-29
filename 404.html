@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f8f5ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='4' width='24' height='24' rx='3' fill='%23faf8f3' stroke='%232a2520' stroke-width='1.4'/><line x1='8' y1='9' x2='24' y2='25' stroke='%232a2520' stroke-width='1.6' stroke-linecap='round'/></svg>">
+<title>Lost in the cuts — Paper Cuts</title>
+<meta name="description" content="That page doesn't exist — but here are the ones that do.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,400;1,300&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --paper-bg: #f8f5ef;
+  --paper-card: #fdfbf7;
+  --ink: #1a1410;
+  --ink-soft: #5a4d44;
+  --accent: #8b3a2b;
+  --border: rgba(0,0,0,0.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper-bg: #14110e;
+    --paper-card: #1a1714;
+    --ink: #ece6db;
+    --ink-soft: #a89d8e;
+    --accent: #d6886e;
+    --border: rgba(236,230,219,0.18);
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  background: var(--paper-bg);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 540px;
+  text-align: center;
+}
+.code {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(4rem, 14vw, 7rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  color: var(--accent);
+  margin-bottom: 0.6rem;
+}
+h1 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.4rem, 3.5vw, 1.9rem);
+  font-weight: 400;
+  font-style: italic;
+  margin-bottom: 1rem;
+  color: var(--ink);
+}
+p {
+  font-size: clamp(0.95rem, 1.6vw, 1.05rem);
+  color: var(--ink-soft);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+}
+.links a {
+  display: inline-block;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--paper-card);
+  color: var(--ink);
+  text-decoration: none;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 0.95rem;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.links a:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cuts {
+  display: block;
+  margin: 0 auto 1.5rem;
+  width: clamp(120px, 30vw, 160px);
+  height: auto;
+  opacity: 0.55;
+}
+@media (prefers-color-scheme: dark) {
+  .cuts { opacity: 0.7; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .links a { transition: none; }
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <svg class="cuts" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect x="20" y="20" width="160" height="80" rx="3" fill="var(--paper-card)" stroke="currentColor" stroke-width="1.4"/>
+    <line x1="20" y1="55" x2="180" y2="40" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3,4"/>
+    <line x1="60" y1="20" x2="130" y2="100" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3,4"/>
+    <line x1="100" y1="20" x2="80" y2="100" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3,4"/>
+  </svg>
+  <div class="code">404</div>
+  <h1>this region doesn't exist</h1>
+  <p>The cuts didn't quite line up. Let's get you back to a page that does.</p>
+  <div class="links">
+    <a href="/">home</a>
+    <a href="/blog.html">essay</a>
+    <a href="/game.html">playground</a>
+  </div>
+</main>
+</body>
+</html>
