@@ -168,6 +168,8 @@ body {
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
+  -ms-touch-action: none;
 }
 
 /* ── Sidebar ───────────────────────────────────────────────────── */
@@ -243,6 +245,46 @@ body {
   from { transform: translateX(-50%) scale(0.65); opacity: 0; }
   to   { transform: translateX(-50%) scale(1);    opacity: 1; }
 }
+
+/* ── Mobile / responsive ───────────────────────────────────────── */
+@media (max-width: 720px) {
+  #toolbar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 10px;
+  }
+  #toolbar::-webkit-scrollbar { display: none; }
+  #wordmark { font-size: 14px; margin-right: 8px; }
+  #status { display: none; }
+  .btn { padding: 4px 11px; font-size: 10.5px; }
+  .sep { margin: 0 5px; }
+  #sidebar { width: 130px; }
+  #sidebar-header { padding: 8px 10px 6px; }
+  .piece-row { padding: 5px 10px; gap: 7px; }
+  .piece-area { display: none; }
+  #hint { font-size: 9.5px; padding: 5px 11px; }
+}
+
+@media (max-width: 540px) {
+  #toolbar { height: 44px; gap: 2px; padding: 0 8px; }
+  #wordmark { display: none; }
+  #home-link { width: 32px; height: 32px; }
+  .btn { min-height: 32px; }
+  .essay-link { padding: 6px 8px; }
+  #sidebar { display: none; }
+  /* Bottom sheet pieces panel — collapsed by default to maximize canvas */
+  .piece-row { padding: 6px 12px; }
+}
+
+/* honor reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .btn, #home-link, .essay-link { transition: none; }
+  @keyframes popIn { from, to { opacity: 1; transform: translateX(-50%) scale(1); } }
+}
+
+/* prevent the iOS rubber-band scroll while interacting with canvas */
+html, body { overscroll-behavior: none; }
 </style>
 </head>
 <body>
@@ -895,8 +937,9 @@ function getCanvasPt(e) {
 // DRAW MODE EVENTS
 // ════════════════════════════════════════════════════════════════
 
-canvas.addEventListener('mousedown', e => {
+canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
+  if (e.pointerId !== undefined) { try { canvas.setPointerCapture(e.pointerId); } catch (_) {} }
   if (mode === 'draw') {
     mouseDownPt = snapPoint(clampPage(getPagePt(e)));
     isMouseDown = true; render();
@@ -905,7 +948,7 @@ canvas.addEventListener('mousedown', e => {
   }
 });
 
-canvas.addEventListener('mousemove', e => {
+canvas.addEventListener('pointermove', e => {
   if (mode === 'draw') {
     mousePos = clampPage(getPagePt(e)); render();
   } else if (dragPiece) {
@@ -916,7 +959,8 @@ canvas.addEventListener('mousemove', e => {
   }
 });
 
-canvas.addEventListener('mouseup', e => {
+canvas.addEventListener('pointerup', e => {
+  if (e.pointerId !== undefined) { try { canvas.releasePointerCapture(e.pointerId); } catch (_) {} }
   if (mode === 'draw') {
     const finalPt = snapPoint(clampPage(getPagePt(e)));
     const moved   = mouseDownPt ? dist(finalPt, mouseDownPt) : 0;
@@ -926,7 +970,7 @@ canvas.addEventListener('mouseup', e => {
       if (dist(finalPt, mouseDownPt) > MIN_LEN) commitSegment(mouseDownPt, finalPt);
       firstClickPt = null;
     } else {
-      // Click gesture → two-click mode
+      // Click/tap gesture → two-click mode
       if (!firstClickPt) {
         firstClickPt = snapPoint(mouseDownPt || finalPt);
       } else {
@@ -941,8 +985,16 @@ canvas.addEventListener('mouseup', e => {
   }
 });
 
-canvas.addEventListener('mouseleave', () => {
-  if (mode === 'draw') { mousePos = null; render(); }
+canvas.addEventListener('pointercancel', () => {
+  if (mode === 'draw') {
+    firstClickPt = mouseDownPt = null; isMouseDown = false; mousePos = null; render();
+  } else if (dragPiece) {
+    dragPiece = null; canvas.style.cursor = 'grab'; render();
+  }
+});
+
+canvas.addEventListener('pointerleave', e => {
+  if (e.pointerType !== 'touch' && mode === 'draw') { mousePos = null; render(); }
 });
 
 canvas.addEventListener('contextmenu', e => {
