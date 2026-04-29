@@ -1208,9 +1208,10 @@ function resize() {
   canvas.width  = area.clientWidth;
   canvas.height = area.clientHeight;
 
-  // Auto-fit page into canvas with margin. Cap upscale at 1.0 so the page
-  // looks like a piece of paper, not a wall-sized canvas, on big screens.
-  const margin   = Math.min(24, Math.max(8, canvas.width * 0.04));
+  // Auto-fit page into canvas with generous margin so corners are easy to
+  // reach with a thumb on phones. Cap upscale at 1.0 so the page still looks
+  // like a piece of paper on big screens.
+  const margin   = Math.min(48, Math.max(22, canvas.width * 0.09));
   const scaleW   = (canvas.width  - margin * 2) / PAGE_W;
   const scaleH   = (canvas.height - margin * 2) / PAGE_H;
   const newScale = Math.max(0.35, Math.min(1, Math.min(scaleW, scaleH)));
