@@ -960,11 +960,33 @@ canvas.addEventListener('pointermove', e => {
     mousePos = clampPage(getPagePt(e)); render();
   } else if (dragPiece) {
     const cp = getCanvasPt(e);
-    dragPiece.pos.x = cp.x - dragOff.x;
-    dragPiece.pos.y = cp.y - dragOff.y;
+    const newPos = clampPiecePos(dragPiece, cp.x - dragOff.x, cp.y - dragOff.y);
+    dragPiece.pos.x = newPos.x;
+    dragPiece.pos.y = newPos.y;
     render();
   }
 });
+
+// Keep at least 20% of every piece's bounding box inside the canvas, so the
+// user can always grab any piece — no piece can be dragged fully into a corner
+// or fully under another.
+function clampPiecePos(piece, px, py) {
+  const b = piece.bbox;
+  const left   = b.minX * scale, right  = b.maxX * scale;
+  const top    = b.minY * scale, bottom = b.maxY * scale;
+  const bboxW  = right - left,   bboxH  = bottom - top;
+  const visW   = Math.max(20, bboxW * 0.2);
+  const visH   = Math.max(20, bboxH * 0.2);
+  // Constrain so piece's bbox is at least visW / visH inside the canvas
+  const minPx  = visW - right;
+  const maxPx  = canvas.width  - visW - left;
+  const minPy  = visH - bottom;
+  const maxPy  = canvas.height - visH - top;
+  return {
+    x: Math.max(minPx, Math.min(maxPx, px)),
+    y: Math.max(minPy, Math.min(maxPy, py)),
+  };
+}
 
 canvas.addEventListener('pointerup', e => {
   if (e.pointerId !== undefined) { try { canvas.releasePointerCapture(e.pointerId); } catch (_) {} }
@@ -1059,24 +1081,43 @@ function enterScatter() {
   // pieces — otherwise piece positions are computed against stale dimensions.
   resize();
 
-  pieces = faces.map(f => ({
-    face: f,
-    pos:     { x: f.centroid.x * scale + ox, y: f.centroid.y * scale + oy },
-    origPos: { x: f.centroid.x * scale + ox, y: f.centroid.y * scale + oy },
-    snapped: false,
-  }));
+  pieces = faces.map(f => {
+    // Bounding box of the polygon in logical coords, relative to centroid
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const vi of f.poly) {
+      const v = vertices[vi];
+      const dx = v.x - f.centroid.x, dy = v.y - f.centroid.y;
+      if (dx < minX) minX = dx; if (dx > maxX) maxX = dx;
+      if (dy < minY) minY = dy; if (dy > maxY) maxY = dy;
+    }
+    return {
+      face:    f,
+      pos:     { x: f.centroid.x * scale + ox, y: f.centroid.y * scale + oy },
+      origPos: { x: f.centroid.x * scale + ox, y: f.centroid.y * scale + oy },
+      snapped: false,
+      bbox:    { minX, maxX, minY, maxY },  // logical-coord offsets from centroid
+    };
+  });
 
   const CX = canvas.width / 2, CY = canvas.height / 2;
-  // Pieces are rendered at PAGE_W/H * scale; scatter radius leaves ~half a piece
-  // of margin on every side so nothing flies off the canvas on narrow viewports.
-  const pieceHalfW = (PAGE_W * scale) / 2;
-  const pieceHalfH = (PAGE_H * scale) / 2;
-  const maxR = Math.min(CX - pieceHalfW * 0.6, CY - pieceHalfH * 0.6);
-  const R    = Math.max(40, Math.min(Math.min(canvas.width, canvas.height) * 0.38, maxR));
+  // Compute a scatter radius that lets every piece start fully visible. Cap
+  // by the smallest dimension so pieces don't all clump in the middle.
+  let maxExt = 0;
+  for (const p of pieces) {
+    maxExt = Math.max(
+      maxExt,
+      Math.abs(p.bbox.minX) * scale, p.bbox.maxX * scale,
+      Math.abs(p.bbox.minY) * scale, p.bbox.maxY * scale,
+    );
+  }
+  const safeR = Math.max(0, Math.min(CX, CY) - maxExt - 4);
+  const R = Math.max(60, safeR);
   pieces.forEach((p, i) => {
-    const ang = (i / pieces.length) * Math.PI * 2 + (Math.random() - 0.5) * 1.2;
-    const r   = R * (0.42 + Math.random() * 0.58);
-    animateTo(p, CX + Math.cos(ang) * r, CY + Math.sin(ang) * r, 360 + i * 30);
+    // Even angular distribution + small jitter so pieces don't overlap each other
+    const ang = (i / pieces.length) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const r   = R * (0.85 + Math.random() * 0.15);
+    const target = clampPiecePos(p, CX + Math.cos(ang) * r, CY + Math.sin(ang) * r);
+    animateTo(p, target.x, target.y, 360 + i * 30);
   });
 
   setHint('Drag pieces back to their ghost outlines');
