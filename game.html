@@ -99,8 +99,11 @@ body {
   background: rgba(255,255,255,0.07);
   outline: none;
 }
-@media (max-width: 640px) {
-  .essay-link { display: none; }
+.essay-link .essay-link-full { display: inline; }
+.essay-link .essay-link-short { display: none; }
+@media (max-width: 720px) {
+  .essay-link .essay-link-full { display: none; }
+  .essay-link .essay-link-short { display: inline; }
 }
 
 .sep {
@@ -252,7 +255,10 @@ body {
     <span id="wordmark-icon">✂</span>
     Paper Cuts
   </span>
-  <a class="essay-link" href="blog.html" title="Read the essay">read the essay →</a>
+  <a class="essay-link" href="blog.html" title="Read the essay">
+    <span class="essay-link-full">read the essay →</span>
+    <span class="essay-link-short">essay →</span>
+  </a>
   <div class="sep"></div>
   <button class="btn active" id="btn-draw">Draw</button>
   <button class="btn" id="btn-undo" disabled>Undo</button>
