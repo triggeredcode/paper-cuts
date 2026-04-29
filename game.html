@@ -381,6 +381,7 @@ let flashRafRunning = false;
 const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
 let ox = 0, oy = 0;   // page origin in canvas pixels
+let scale = 1;        // page → canvas scale factor (auto-fit to viewport)
 
 // --- Paper texture (pre-rendered offscreen canvas)
 let paperTexture = null;
@@ -740,6 +741,7 @@ function traceFacePath(poly) {
 function renderDraw() {
   ctx.save();
   ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
 
   // Page shadow (two passes: soft outer + sharp inner)
   ctx.shadowColor = 'rgba(30,15,5,0.45)';
@@ -841,6 +843,7 @@ function renderDraw() {
 function renderScatter() {
   ctx.save();
   ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
 
   // Ghost page
   ctx.strokeStyle = 'rgba(240,220,190,0.28)'; ctx.lineWidth = 1.2;
@@ -860,13 +863,13 @@ function renderScatter() {
   for (const p of pieces) { if (p.snapped) drawSnapped(p); }
   ctx.restore();
 
-  // Floating pieces
+  // Floating pieces (live in absolute canvas coords; scale to match page render)
   for (const p of pieces) {
     if (p.snapped || p === dragPiece) continue;
-    ctx.save(); ctx.translate(p.pos.x, p.pos.y); drawFloating(p, false); ctx.restore();
+    ctx.save(); ctx.translate(p.pos.x, p.pos.y); ctx.scale(scale, scale); drawFloating(p, false); ctx.restore();
   }
   if (dragPiece && !dragPiece.snapped) {
-    ctx.save(); ctx.translate(dragPiece.pos.x, dragPiece.pos.y); drawFloating(dragPiece, true); ctx.restore();
+    ctx.save(); ctx.translate(dragPiece.pos.x, dragPiece.pos.y); ctx.scale(scale, scale); drawFloating(dragPiece, true); ctx.restore();
   }
 }
 
@@ -925,7 +928,10 @@ function drawSnapped(p) {
 function getPagePt(e) {
   const r = canvas.getBoundingClientRect();
   const sx = canvas.width / r.width, sy = canvas.height / r.height;
-  return { x: (e.clientX - r.left) * sx - ox, y: (e.clientY - r.top) * sy - oy };
+  return {
+    x: ((e.clientX - r.left) * sx - ox) / scale,
+    y: ((e.clientY - r.top) * sy - oy) / scale,
+  };
 }
 
 function getCanvasPt(e) {
@@ -1025,7 +1031,9 @@ function startDrag(e) {
   for (let i = pieces.length - 1; i >= 0; i--) {
     const p = pieces[i];
     if (p.snapped) continue;
-    const local = { x: cp.x - p.pos.x, y: cp.y - p.pos.y };
+    // Compare in logical coords: scale the canvas-pixel offset down to match
+    // polygon points which are stored in page-logical units.
+    const local = { x: (cp.x - p.pos.x) / scale, y: (cp.y - p.pos.y) / scale };
     const pts   = p.face.poly.map(vi => ({
       x: vertices[vi].x - p.face.centroid.x,
       y: vertices[vi].y - p.face.centroid.y,
@@ -1043,25 +1051,34 @@ function enterScatter() {
   canvas.style.cursor = 'grab';
   document.getElementById('solved-msg').style.display = 'none';
 
+  El('btn-draw').classList.remove('active');
+  El('btn-scatter').style.display = 'none';
+  El('btn-back').style.display    = 'inline-block';
+  El('sidebar').style.display     = 'none';
+  // Recompute canvas size + scale now that sidebar is hidden, BEFORE we place
+  // pieces — otherwise piece positions are computed against stale dimensions.
+  resize();
+
   pieces = faces.map(f => ({
     face: f,
-    pos:     { x: f.centroid.x + ox, y: f.centroid.y + oy },
-    origPos: { x: f.centroid.x + ox, y: f.centroid.y + oy },
+    pos:     { x: f.centroid.x * scale + ox, y: f.centroid.y * scale + oy },
+    origPos: { x: f.centroid.x * scale + ox, y: f.centroid.y * scale + oy },
     snapped: false,
   }));
 
   const CX = canvas.width / 2, CY = canvas.height / 2;
-  const R  = Math.min(canvas.width, canvas.height) * 0.38;
+  // Pieces are rendered at PAGE_W/H * scale; scatter radius leaves ~half a piece
+  // of margin on every side so nothing flies off the canvas on narrow viewports.
+  const pieceHalfW = (PAGE_W * scale) / 2;
+  const pieceHalfH = (PAGE_H * scale) / 2;
+  const maxR = Math.min(CX - pieceHalfW * 0.6, CY - pieceHalfH * 0.6);
+  const R    = Math.max(40, Math.min(Math.min(canvas.width, canvas.height) * 0.38, maxR));
   pieces.forEach((p, i) => {
     const ang = (i / pieces.length) * Math.PI * 2 + (Math.random() - 0.5) * 1.2;
     const r   = R * (0.42 + Math.random() * 0.58);
     animateTo(p, CX + Math.cos(ang) * r, CY + Math.sin(ang) * r, 360 + i * 30);
   });
 
-  El('btn-draw').classList.remove('active');
-  El('btn-scatter').style.display = 'none';
-  El('btn-back').style.display    = 'inline-block';
-  El('sidebar').style.display     = 'none';
   setHint('Drag pieces back to their ghost outlines');
 }
 
@@ -1071,10 +1088,10 @@ function exitScatter() {
   El('btn-draw').classList.add('active');
   El('btn-scatter').style.display = 'inline-block';
   El('btn-back').style.display    = 'none';
-  El('sidebar').style.display     = 'flex';
+  El('sidebar').style.display     = '';
   El('solved-msg').style.display  = 'none';
   setHint(DRAW_HINT);
-  render();
+  resize();
 }
 
 function trySnap(piece) {
@@ -1119,16 +1136,17 @@ function fullReset() {
   // 4. Clear flash animations
   cutFlashes = []; flashRafRunning = false;
 
-  // 5. Reset toolbar to draw-mode state
+  // 5. Reset toolbar to draw-mode state (let CSS control sidebar visibility per breakpoint)
   canvas.style.cursor = DRAW_CURSOR;
   El('btn-draw').classList.add('active');
   El('btn-scatter').style.display = 'inline-block';
   El('btn-back').style.display    = 'none';
-  El('sidebar').style.display     = 'flex';
+  El('sidebar').style.display     = '';
   El('solved-msg').style.display  = 'none';
   setHint(DRAW_HINT);
 
-  // 6. Rebuild geometry + update sidebar/toolbar + render
+  // 6. Rebuild geometry + update sidebar/toolbar + render at correct scale
+  resize();
   rebuild();
 }
 
@@ -1189,19 +1207,31 @@ function resize() {
   const area   = El('canvas-area');
   canvas.width  = area.clientWidth;
   canvas.height = area.clientHeight;
-  const newOx   = Math.round((canvas.width  - PAGE_W) / 2);
-  const newOy   = Math.round((canvas.height - PAGE_H) / 2);
 
-  // In scatter mode, origPos is absolute canvas coords → update when canvas shifts
+  // Auto-fit page into canvas with margin. Cap upscale at 1.0 so the page
+  // looks like a piece of paper, not a wall-sized canvas, on big screens.
+  const margin   = Math.min(24, Math.max(8, canvas.width * 0.04));
+  const scaleW   = (canvas.width  - margin * 2) / PAGE_W;
+  const scaleH   = (canvas.height - margin * 2) / PAGE_H;
+  const newScale = Math.max(0.35, Math.min(1, Math.min(scaleW, scaleH)));
+
+  const newOx = Math.round((canvas.width  - PAGE_W * newScale) / 2);
+  const newOy = Math.round((canvas.height - PAGE_H * newScale) / 2);
+
+  // In scatter mode, piece positions are in absolute canvas pixels — remap
+  // them so each piece keeps the same visual offset from its ghost outline.
   if (mode === 'scatter' && pieces.length > 0) {
-    const dox = newOx - ox, doy = newOy - oy;
     for (const p of pieces) {
-      p.origPos.x += dox; p.origPos.y += doy;
-      if (!p.snapped) { p.pos.x += dox; p.pos.y += doy; }
+      const newOrigX = p.face.centroid.x * newScale + newOx;
+      const newOrigY = p.face.centroid.y * newScale + newOy;
+      const dx = newOrigX - p.origPos.x;
+      const dy = newOrigY - p.origPos.y;
+      p.origPos.x = newOrigX; p.origPos.y = newOrigY;
+      p.pos.x += dx; p.pos.y += dy;
     }
   }
 
-  ox = newOx; oy = newOy;
+  scale = newScale; ox = newOx; oy = newOy;
   render();
 }
 
