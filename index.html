@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f8f5ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<title>Paper Cuts — Essay & Interactive Playground</title>
+<meta name="description" content="A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions. Read the essay, then play the game.">
+<meta name="author" content="@omkar_builds">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Paper Cuts — Essay & Interactive Playground">
+<meta property="og:description" content="Read the essay, then play the game. A deceptively simple DSA problem about decomposition.">
+<meta property="og:site_name" content="Paper Cuts">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:creator" content="@omkar_builds">
+<meta name="twitter:title" content="Paper Cuts — Essay & Interactive Playground">
+<meta name="twitter:description" content="Read the essay, then play the game.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1714;
+    --ink-light: #5a5650;
+    --paper: #f8f5ef;
+    --paper-dark: #ede9e0;
+    --paper-card: #ffffff;
+    --red: #c0392b;
+    --amber: #C8913A;
+    --walnut: #271C15;
+    --border: rgba(26,23,20,0.12);
+    --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px -8px rgba(60,40,20,0.16);
+    --shadow-hover: 0 1px 2px rgba(0,0,0,0.04), 0 18px 40px -10px rgba(60,40,20,0.28);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #ece6db;
+      --ink-light: #a89f90;
+      --paper: #14110e;
+      --paper-dark: #1f1b16;
+      --paper-card: #1f1b16;
+      --red: #e87060;
+      --amber: #DBA84E;
+      --walnut: #ece6db;
+      --border: rgba(236,230,219,0.14);
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -8px rgba(0,0,0,0.5);
+      --shadow-hover: 0 1px 2px rgba(0,0,0,0.5), 0 18px 40px -10px rgba(0,0,0,0.7);
+    }
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-weight: 300;
+    line-height: 1.7;
+    font-size: clamp(16px, 1rem + 0.15vw, 18px);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background-image:
+      radial-gradient(1200px 600px at 20% 0%, rgba(200,145,58,0.06), transparent 60%),
+      radial-gradient(1000px 600px at 100% 100%, rgba(192,57,43,0.05), transparent 60%);
+  }
+
+  .page {
+    flex: 1;
+    max-width: 960px;
+    width: 100%;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 2rem) clamp(2rem, 4vw, 3rem);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* header */
+  .kicker {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .kicker::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--red);
+    opacity: 0.3;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.4rem, 1.6rem + 4vw, 4rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    margin-bottom: 0.6rem;
+    overflow-wrap: break-word;
+  }
+
+  .subtitle {
+    font-size: clamp(1.05rem, 0.95rem + 0.6vw, 1.3rem);
+    color: var(--ink-light);
+    font-style: italic;
+    margin-bottom: 2.5rem;
+    line-height: 1.5;
+    max-width: 36em;
+  }
+
+  /* animated scissors */
+  @keyframes snip {
+    0%, 100% { transform: rotate(-5deg); }
+    50% { transform: rotate(8deg); }
+  }
+  .snip {
+    display: inline-block;
+    animation: snip 2.4s ease-in-out infinite;
+    transform-origin: bottom center;
+  }
+
+  /* card grid */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: clamp(1rem, 2.5vw, 1.75rem);
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: clamp(1.5rem, 3vw, 2rem);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.25s cubic-bezier(.2,.8,.2,1), box-shadow 0.25s ease, border-color 0.25s ease;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+    min-height: 320px;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+    border-color: var(--ink);
+    outline: none;
+  }
+  .card:focus-visible {
+    outline: 2px solid var(--red);
+    outline-offset: 3px;
+  }
+
+  .card-icon-wrap {
+    position: absolute;
+    top: 1.2rem;
+    right: 1.2rem;
+    width: 64px;
+    height: 64px;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .card-icon-wrap svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .card-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.8rem;
+  }
+  .card.is-game .card-tag { color: var(--amber); }
+
+  .card h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 1.9rem);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.7rem;
+  }
+
+  .card p {
+    color: var(--ink-light);
+    margin-bottom: 1.4rem;
+    line-height: 1.6;
+    flex: 1;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-light);
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+  }
+  .card-meta .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .card-meta .meta-sep { opacity: 0.4; }
+
+  .card-arrow {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    color: var(--ink-light);
+    transition: transform 0.25s cubic-bezier(.2,.8,.2,1), color 0.25s ease;
+  }
+  .card:hover .card-arrow,
+  .card:focus-visible .card-arrow {
+    transform: translateX(4px);
+    color: var(--ink);
+  }
+
+  /* outline section */
+  .outline {
+    margin-top: auto;
+    padding-top: clamp(1.5rem, 3vw, 2rem);
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.2rem 2rem;
+    color: var(--ink-light);
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+  .outline h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.5rem;
+  }
+  .outline p { margin: 0; }
+
+  /* footer */
+  .page-footer {
+    border-top: 1px solid var(--border);
+    padding: 1.4rem clamp(1rem, 4vw, 2rem);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-light);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem 1.2rem;
+    max-width: 960px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .page-footer a {
+    color: var(--ink-light);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--border);
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+  .page-footer a:hover, .page-footer a:focus-visible {
+    color: var(--red);
+    border-bottom-color: var(--red);
+    outline: none;
+  }
+  .twitter-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .twitter-cta svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    html { scroll-behavior: auto; }
+  }
+
+  @media (max-width: 600px) {
+    .card { min-height: 0; padding: 1.4rem; }
+    .card-icon-wrap { width: 50px; height: 50px; top: 1rem; right: 1rem; }
+    h1 { letter-spacing: -0.02em; }
+    .page-footer { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<main class="page">
+
+  <header>
+    <div class="kicker">DSA · Computational Geometry · Read & Play</div>
+    <h1>Paper Cuts <span class="snip" aria-hidden="true">✂</span></h1>
+    <p class="subtitle">A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions. Read the essay, then play the game.</p>
+  </header>
+
+  <section class="card-grid" aria-label="Choose your path">
+
+    <a class="card is-blog" href="blog.html" aria-label="Read the essay — about 10 minute read">
+      <div class="card-icon-wrap" aria-hidden="true">
+        <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="22" y="14" width="56" height="72" rx="2" stroke="currentColor"/>
+          <line x1="32" y1="30" x2="68" y2="30" stroke="currentColor" stroke-opacity="0.7"/>
+          <line x1="32" y1="40" x2="68" y2="40" stroke="currentColor" stroke-opacity="0.7"/>
+          <line x1="32" y1="50" x2="58" y2="50" stroke="currentColor" stroke-opacity="0.7"/>
+          <line x1="32" y1="60" x2="68" y2="60" stroke="currentColor" stroke-opacity="0.7"/>
+          <line x1="32" y1="70" x2="50" y2="70" stroke="currentColor" stroke-opacity="0.7"/>
+        </svg>
+      </div>
+      <div class="card-tag">The Essay</div>
+      <h2>Read the article</h2>
+      <p>A walk through the problem space. Why "cut a page into pieces" turns into 11 design questions about PSLG, DCEL, T-junctions, and degenerate intersections — long before you write a single line of code.</p>
+      <div class="card-meta">
+        <span class="meta-item">~10 min read</span>
+        <span class="meta-sep">·</span>
+        <span class="meta-item">essay</span>
+        <span class="card-arrow" aria-hidden="true">→</span>
+      </div>
+    </a>
+
+    <a class="card is-game" href="game.html" aria-label="Play the game — interactive paper cutting tool">
+      <div class="card-icon-wrap" aria-hidden="true">
+        <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="18" y="18" width="64" height="64" rx="2" stroke="currentColor"/>
+          <line x1="18" y1="50" x2="82" y2="50" stroke="currentColor" stroke-dasharray="3 2"/>
+          <line x1="50" y1="18" x2="50" y2="82" stroke="currentColor" stroke-dasharray="3 2"/>
+          <line x1="18" y1="72" x2="82" y2="32" stroke="currentColor" stroke-dasharray="3 2"/>
+          <circle cx="50" cy="50" r="2.5" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="card-tag">The Playground</div>
+      <h2>Play the game</h2>
+      <p>Click two points on a page and a cut appears between them. Snap to edges, scatter the pieces, see the regions emerge. The same geometry the essay describes — but where you can actually feel it.</p>
+      <div class="card-meta">
+        <span class="meta-item">interactive</span>
+        <span class="meta-sep">·</span>
+        <span class="meta-item">no install</span>
+        <span class="card-arrow" aria-hidden="true">→</span>
+      </div>
+    </a>
+
+  </section>
+
+  <section class="outline" aria-label="Why this exists">
+    <div>
+      <h3>The Idea</h3>
+      <p>Take a unit square. Make a few straight cuts. How many regions did you just create? The answer involves planar straight-line graphs and a forest of design choices most tutorials skip.</p>
+    </div>
+    <div>
+      <h3>Read First, Play Second</h3>
+      <p>The essay names the problem and surfaces the questions. The game lets you trip over them yourself. Either order works — the playground is forgiving, the essay is opinionated.</p>
+    </div>
+    <div>
+      <h3>Open</h3>
+      <p>This is a thinking-out-loud project. Counterexamples, suggestions, and arguments about T-junctions all welcome. Reach me on Twitter — link below.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="page-footer">
+  <span>© 2026 · Paper Cuts · thinking out loud</span>
+  <a class="twitter-cta" href="https://twitter.com/omkar_builds" rel="author noopener" target="_blank" aria-label="Follow @omkar_builds on Twitter">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    <span>@omkar_builds</span>
+  </a>
+</footer>
+
+</body>
+</html>

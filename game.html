@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Cuts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Design tokens ──────────────────────────────────────────────── */
+:root {
+  --walnut:      #271C15;
+  --walnut-mid:  #36261C;
+  --walnut-lite: #4A3326;
+  --cream:       #EDE0CE;
+  --cream-muted: #9A8472;
+  --amber:       #C8913A;
+  --amber-lite:  #DBA84E;
+  --danger:      #C04040;
+  --border:      rgba(255,255,255,0.07);
+  --snap-green:  #5A8A6A;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'IBM Plex Mono', monospace;
+  background: #B8AFA5;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--cream);
+}
+
+/* ── Toolbar ───────────────────────────────────────────────────── */
+#toolbar {
+  background: var(--walnut);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+#wordmark {
+  font-family: 'Playfair Display', serif;
+  font-size: 15px;
+  color: var(--cream);
+  letter-spacing: 0.02em;
+  margin-right: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+#wordmark-icon { font-size: 14px; opacity: 0.75; }
+
+#home-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--cream);
+  opacity: 0.55;
+  font-size: 14px;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+#home-link:hover, #home-link:focus-visible {
+  opacity: 1;
+  background: rgba(255,255,255,0.07);
+  outline: none;
+}
+
+.essay-link {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  opacity: 0.55;
+  text-decoration: none;
+  margin-left: 10px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.essay-link:hover, .essay-link:focus-visible {
+  opacity: 1;
+  background: rgba(255,255,255,0.07);
+  outline: none;
+}
+@media (max-width: 640px) {
+  .essay-link { display: none; }
+}
+
+.sep {
+  width: 1px; height: 20px;
+  background: var(--border);
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+.btn {
+  padding: 4px 13px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 400;
+  color: var(--cream);
+  opacity: 0.85;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+  white-space: nowrap;
+  line-height: 22px;
+  letter-spacing: 0.04em;
+}
+.btn:hover:not(:disabled) {
+  background: var(--walnut-mid);
+  border-color: rgba(255,255,255,0.25);
+  opacity: 1;
+}
+.btn.active {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--walnut);
+  opacity: 1;
+  font-weight: 500;
+}
+.btn.danger {
+  color: #E88080;
+  border-color: rgba(200,80,80,0.35);
+}
+.btn.danger:hover:not(:disabled) {
+  background: rgba(180,50,50,0.25);
+  border-color: rgba(200,80,80,0.6);
+}
+.btn:disabled { opacity: 0.28; cursor: default; }
+
+#status {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--cream-muted);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+/* ── Main ──────────────────────────────────────────────────────── */
+#main { flex: 1; display: flex; overflow: hidden; }
+
+#canvas-area { flex: 1; position: relative; overflow: hidden; }
+
+#canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+#sidebar {
+  width: 168px;
+  background: var(--walnut);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+#sidebar-header {
+  padding: 10px 13px 8px;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cream-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+#pieces-list { flex: 1; overflow-y: auto; }
+#pieces-list::-webkit-scrollbar { width: 3px; }
+#pieces-list::-webkit-scrollbar-thumb { background: var(--walnut-lite); border-radius: 2px; }
+
+.piece-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.1s;
+}
+.piece-row:hover { background: var(--walnut-mid); }
+.piece-swatch {
+  width: 11px; height: 11px;
+  border-radius: 2px; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.piece-id { font-size: 10px; color: var(--cream); flex: 1; letter-spacing: 0.06em; }
+.piece-area { font-size: 9px; color: var(--cream-muted); }
+
+/* ── HUD overlays ──────────────────────────────────────────────── */
+#hint {
+  position: absolute;
+  bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30,20,12,0.80);
+  backdrop-filter: blur(8px);
+  color: rgba(240,224,200,0.85);
+  font-size: 10px; font-weight: 400;
+  padding: 5px 14px; border-radius: 20px;
+  pointer-events: none; white-space: nowrap;
+  transition: opacity 0.35s;
+  letter-spacing: 0.06em;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+#solved-msg {
+  display: none;
+  position: absolute; bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--snap-green);
+  color: #fff; font-size: 11px; font-weight: 500;
+  padding: 6px 18px; border-radius: 20px;
+  pointer-events: none; white-space: nowrap;
+  letter-spacing: 0.06em;
+  animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes popIn {
+  from { transform: translateX(-50%) scale(0.65); opacity: 0; }
+  to   { transform: translateX(-50%) scale(1);    opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <a id="home-link" href="index.html" title="Back to Paper Cuts home" aria-label="Back to home">
+    <span id="home-arrow">←</span>
+  </a>
+  <span id="wordmark">
+    <span id="wordmark-icon">✂</span>
+    Paper Cuts
+  </span>
+  <a class="essay-link" href="blog.html" title="Read the essay">read the essay →</a>
+  <div class="sep"></div>
+  <button class="btn active" id="btn-draw">Draw</button>
+  <button class="btn" id="btn-undo" disabled>Undo</button>
+  <div class="sep"></div>
+  <button class="btn" id="btn-scatter" disabled>Scatter ↗</button>
+  <button class="btn" id="btn-back" style="display:none">← Back</button>
+  <div class="sep"></div>
+  <button class="btn danger" id="btn-clear">Clear</button>
+  <span id="status">no cuts</span>
+</div>
+
+<div id="main">
+  <div id="canvas-area">
+    <canvas id="canvas"></canvas>
+    <div id="hint">Click · drag to cut &nbsp;|&nbsp; endpoints snap to edges</div>
+    <div id="solved-msg">✓ Reassembled</div>
+  </div>
+  <div id="sidebar">
+    <div id="sidebar-header">Pieces</div>
+    <div id="pieces-list"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════════════════════════
+const PAGE_W     = 440;
+const PAGE_H     = 580;
+const VERT_EPS   = 1.2;    // vertex dedup radius
+const MIN_LEN    = 5;      // minimum segment length
+const SNAP_R     = 18;     // endpoint snap radius (page px)
+const SCATTER_SD = 30;     // scatter reassembly snap radius (canvas px)
+const DRAW_HINT  = 'Click · drag to cut \u00a0|\u00a0 endpoints snap to edges';
+
+// Muted watercolour/gouache paper palette
+const PALETTE = [
+  '#FF6B6B','#FF9F43','#FECA57','#48DBFB','#FF9FF3',
+  '#54A0FF','#5F27CD','#00D2D3','#1DD1A1','#FD9644',
+  '#EE5A24','#009432','#0652DD','#9980FA','#ED4C67',
+  '#F9CA24','#6AB04C','#22A6B3','#BE2EDD','#4834D4',
+];
+
+const DRAW_CURSOR = 'crosshair';
+
+// ════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════
+
+// --- Geometry
+let segments   = [];   // user-drawn: [{x1,y1,x2,y2}]
+let vertices   = [];   // rebuilt: [{x,y}]
+let edges      = [];   // rebuilt: [{a,b}]
+let faces      = [];   // rebuilt: [{poly,area,id,color,centroid}]
+let colorCache = {};   // stable face color by vertex-key
+
+// --- Draw interaction
+let mode         = 'draw';
+let firstClickPt = null;
+let mouseDownPt  = null;
+let isMouseDown  = false;
+let mousePos     = null;
+
+// --- Scatter interaction
+let pieces    = [];
+let dragPiece = null;
+let dragOff   = null;
+let scSnapped = 0;
+
+// --- Animation
+let cutFlashes      = [];   // [{x1,y1,x2,y2, born}]
+let flashRafRunning = false;
+
+// --- Canvas / layout
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+let ox = 0, oy = 0;   // page origin in canvas pixels
+
+// --- Paper texture (pre-rendered offscreen canvas)
+let paperTexture = null;
+
+// --- Audio
+let audioCtx = null;
+
+// ════════════════════════════════════════════════════════════════
+// AUDIO — synthesised scissor snip
+// ════════════════════════════════════════════════════════════════
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  }
+  return audioCtx;
+}
+
+function playSnip() {
+  const ac = getAudioCtx();
+  if (!ac) return;
+  const now = ac.currentTime;
+
+  // 1. Metal-blade click: decaying sine ~1.1kHz
+  try {
+    const osc  = ac.createOscillator();
+    const gOsc = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 1100 + Math.random() * 200;
+    gOsc.gain.setValueAtTime(0.18, now);
+    gOsc.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    osc.connect(gOsc); gOsc.connect(ac.destination);
+    osc.start(now); osc.stop(now + 0.05);
+  } catch(e) {}
+
+  // 2. Paper slide: bandpass-filtered white noise
+  try {
+    const dur    = 0.09;
+    const bufLen = Math.ceil(ac.sampleRate * dur);
+    const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const d      = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+
+    const src  = ac.createBufferSource();
+    src.buffer = buf;
+    const bpf  = ac.createBiquadFilter();
+    bpf.type = 'bandpass'; bpf.frequency.value = 3800; bpf.Q.value = 1.2;
+    const gNoise = ac.createGain();
+    gNoise.gain.setValueAtTime(0.14, now);
+    gNoise.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    src.connect(bpf); bpf.connect(gNoise); gNoise.connect(ac.destination);
+    src.start(now); src.stop(now + dur);
+  } catch(e) {}
+}
+
+// ════════════════════════════════════════════════════════════════
+// PAPER TEXTURE
+// ════════════════════════════════════════════════════════════════
+
+function buildPaperTexture() {
+  const oc  = document.createElement('canvas');
+  oc.width  = PAGE_W;
+  oc.height = PAGE_H;
+  const c   = oc.getContext('2d');
+
+  // Warm cream base
+  c.fillStyle = '#F9F2E4';
+  c.fillRect(0, 0, PAGE_W, PAGE_H);
+
+  // Grain noise — deterministic LCG so it doesn't change on render
+  const img = c.getImageData(0, 0, PAGE_W, PAGE_H);
+  const px  = img.data;
+  let seed  = 0xA3D5F1;
+  const rng = () => { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return (seed >>> 0) / 0xFFFFFFFF; };
+  for (let i = 0; i < px.length; i += 4) {
+    const g = (rng() - 0.5) * 16;
+    px[i]   = Math.max(210, Math.min(255, px[i]   + g));
+    px[i+1] = Math.max(195, Math.min(255, px[i+1] + g * 0.88));
+    px[i+2] = Math.max(155, Math.min(225, px[i+2] + g * 0.65));
+  }
+  c.putImageData(img, 0, 0);
+
+  // "Laid" paper lines — faint horizontal bands
+  c.globalAlpha = 0.028;
+  c.strokeStyle = '#6A4820';
+  c.lineWidth   = 0.6;
+  for (let y = 3.5; y < PAGE_H; y += 3.5) {
+    c.beginPath(); c.moveTo(0, y); c.lineTo(PAGE_W, y); c.stroke();
+  }
+  c.globalAlpha = 1;
+
+  // Soft vignette toward edges
+  const grad = c.createRadialGradient(
+    PAGE_W * 0.5, PAGE_H * 0.5, Math.min(PAGE_W, PAGE_H) * 0.3,
+    PAGE_W * 0.5, PAGE_H * 0.5, Math.max(PAGE_W, PAGE_H) * 0.78
+  );
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(55,25,5,0.09)');
+  c.fillStyle = grad;
+  c.fillRect(0, 0, PAGE_W, PAGE_H);
+
+  return oc;
+}
+
+// ════════════════════════════════════════════════════════════════
+// GEOMETRY UTILITIES
+// ════════════════════════════════════════════════════════════════
+
+function dist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
+
+function clampPage(p) {
+  return { x: Math.max(0, Math.min(PAGE_W, p.x)), y: Math.max(0, Math.min(PAGE_H, p.y)) };
+}
+
+function projectOnSeg(pt, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-10) return { x: a.x, y: a.y };
+  const t = Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2));
+  return { x: a.x + t * dx, y: a.y + t * dy };
+}
+
+// Returns {pt, type:'vertex'|'edge', edgeA, edgeB} or null
+function getSnapState(pt) {
+  let bestD = SNAP_R, best = null;
+
+  for (const v of vertices) {
+    const d = dist(v, pt);
+    if (d < bestD) { bestD = d; best = { pt: { x: v.x, y: v.y }, type: 'vertex', edgeA: null, edgeB: null }; }
+  }
+  if (best) return best;  // vertex wins outright
+
+  for (const e of edges) {
+    const va = vertices[e.a], vb = vertices[e.b];
+    const proj = projectOnSeg(pt, va, vb);
+    const d = dist(proj, pt);
+    if (d < bestD) { bestD = d; best = { pt: { x: proj.x, y: proj.y }, type: 'edge', edgeA: va, edgeB: vb }; }
+  }
+  return best;
+}
+
+function snapPoint(pt) {
+  const s = getSnapState(pt);
+  return s ? s.pt : clampPage(pt);
+}
+
+// ════════════════════════════════════════════════════════════════
+// PLANAR SUBDIVISION ENGINE
+// ════════════════════════════════════════════════════════════════
+
+function addVertex(x, y) {
+  for (let i = 0; i < vertices.length; i++)
+    if (Math.hypot(vertices[i].x - x, vertices[i].y - y) < VERT_EPS) return i;
+  vertices.push({ x, y });
+  return vertices.length - 1;
+}
+
+function segIntersect(p1, p2, p3, p4) {
+  const d1x = p2.x - p1.x, d1y = p2.y - p1.y;
+  const d2x = p4.x - p3.x, d2y = p4.y - p3.y;
+  const den = d1x * d2y - d1y * d2x;
+  if (Math.abs(den) < 1e-9) return null;
+  const dx = p3.x - p1.x, dy = p3.y - p1.y;
+  const t = (dx * d2y - dy * d2x) / den;
+  const u = (dx * d1y - dy * d1x) / den;
+  const sl = 0.002;
+  if (t < -sl || t > 1 + sl || u < -sl || u > 1 + sl) return null;
+  const tc = Math.max(0, Math.min(1, t));
+  return { t: tc, u: Math.max(0, Math.min(1, u)), x: p1.x + tc * d1x, y: p1.y + tc * d1y };
+}
+
+function rebuild() {
+  vertices = []; edges = [];
+
+  const all = [
+    { x1:0,      y1:0,      x2:PAGE_W, y2:0      },
+    { x1:PAGE_W, y1:0,      x2:PAGE_W, y2:PAGE_H  },
+    { x1:PAGE_W, y1:PAGE_H, x2:0,      y2:PAGE_H  },
+    { x1:0,      y1:PAGE_H, x2:0,      y2:0       },
+    ...segments,
+  ];
+
+  const splits = all.map(() => new Set([0, 1]));
+  for (let i = 0; i < all.length; i++) {
+    const p1 = { x: all[i].x1, y: all[i].y1 }, p2 = { x: all[i].x2, y: all[i].y2 };
+    for (let j = i + 1; j < all.length; j++) {
+      const hit = segIntersect(p1, p2, { x: all[j].x1, y: all[j].y1 }, { x: all[j].x2, y: all[j].y2 });
+      if (hit) { splits[i].add(hit.t); splits[j].add(hit.u); }
+    }
+  }
+  for (let i = 0; i < all.length; i++) {
+    const s = all[i], ts = [...splits[i]].sort((a, b) => a - b);
+    for (let k = 0; k < ts.length - 1; k++) {
+      const ta = ts[k], tb = ts[k + 1];
+      if (tb - ta < 1e-9) continue;
+      const pa = { x: s.x1 + ta * (s.x2 - s.x1), y: s.y1 + ta * (s.y2 - s.y1) };
+      const pb = { x: s.x1 + tb * (s.x2 - s.x1), y: s.y1 + tb * (s.y2 - s.y1) };
+      const a = addVertex(pa.x, pa.y), b = addVertex(pb.x, pb.y);
+      if (a !== b && !edges.some(e => (e.a === a && e.b === b) || (e.a === b && e.b === a)))
+        edges.push({ a, b });
+    }
+  }
+
+  faces = extractFaces();
+  syncUI();
+  render();
+}
+
+// ── DCEL face extraction ───────────────────────────────────────────
+
+function extractFaces() {
+  if (edges.length < 3) return [];
+  const nv = vertices.length;
+
+  const HE = [], heMap = new Map();
+  for (const e of edges) {
+    const i = HE.length;
+    HE.push({ from: e.a, to: e.b, next: -1 });
+    HE.push({ from: e.b, to: e.a, next: -1 });
+    heMap.set(`${e.a},${e.b}`, i);
+    heMap.set(`${e.b},${e.a}`, i + 1);
+  }
+
+  const out = Array.from({ length: nv }, () => []);
+  for (let i = 0; i < HE.length; i++) out[HE[i].from].push(i);
+  for (let v = 0; v < nv; v++) {
+    out[v].sort((i, j) => {
+      const ai = Math.atan2(vertices[HE[i].to].y - vertices[v].y, vertices[HE[i].to].x - vertices[v].x);
+      const aj = Math.atan2(vertices[HE[j].to].y - vertices[v].y, vertices[HE[j].to].x - vertices[v].x);
+      return ai - aj;
+    });
+  }
+
+  for (let i = 0; i < HE.length; i++) {
+    const h = HE[i];
+    const twin = heMap.get(`${h.to},${h.from}`);
+    if (twin === undefined) continue;
+    const vOut = out[h.to], tPos = vOut.indexOf(twin);
+    if (tPos === -1) continue;
+    HE[i].next = vOut[(tPos - 1 + vOut.length) % vOut.length];
+  }
+
+  const visited = new Set(), result = [];
+  for (let start = 0; start < HE.length; start++) {
+    if (visited.has(start) || HE[start].next === -1) continue;
+    const poly = []; let cur = start, steps = 0;
+    while (!visited.has(cur) && cur !== -1 && steps++ < HE.length + 4) {
+      visited.add(cur); poly.push(HE[cur].from); cur = HE[cur].next;
+    }
+    if (poly.length < 3) continue;
+
+    let area = 0;
+    for (let j = 0; j < poly.length; j++) {
+      const a = vertices[poly[j]], b = vertices[poly[(j + 1) % poly.length]];
+      area += a.x * b.y - b.x * a.y;
+    }
+    area /= 2;
+    if (area < 1) continue;
+
+    let cx = 0, cy = 0;
+    for (const vi of poly) { cx += vertices[vi].x; cy += vertices[vi].y; }
+    cx /= poly.length; cy /= poly.length;
+
+    const key = poly
+      .map(vi => `${Math.round(vertices[vi].x * 2) / 2},${Math.round(vertices[vi].y * 2) / 2}`)
+      .sort().join('|');
+    if (!colorCache[key])
+      colorCache[key] = PALETTE[Object.keys(colorCache).length % PALETTE.length];
+
+    result.push({ poly, area, color: colorCache[key], centroid: { x: cx, y: cy } });
+  }
+
+  result.sort((a, b) => a.centroid.y - b.centroid.y || a.centroid.x - b.centroid.x);
+  result.forEach((f, i) => { f.id = i + 1; f.directChildren = []; });
+
+  // ── Containment tree ─────────────────────────────────────────
+  // For each face, find its direct parent = smallest face whose polygon contains its centroid.
+  for (const inner of result) {
+    let directParent = null;
+    for (const outer of result) {
+      if (outer === inner) continue;
+      if (outer.area <= inner.area) continue;
+      const outerPts = outer.poly.map(vi => vertices[vi]);
+      if (!polyContainsPt(outerPts, inner.centroid)) continue;
+      // outer contains inner — keep only the smallest such outer
+      if (!directParent || outer.area < directParent.area) directParent = outer;
+    }
+    if (directParent) directParent.directChildren.push(inner);
+  }
+
+  return result;
+}
+
+// Point-in-polygon (ray casting)
+function polyContainsPt(pts, pt) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    if (((yi > pt.y) !== (yj > pt.y)) && (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi))
+      inside = !inside;
+  }
+  return inside;
+}
+
+function isBoundaryEdge(va, vb) {
+  const E = VERT_EPS;
+  const L = p => p.x < E, R = p => p.x > PAGE_W - E;
+  const T = p => p.y < E, B = p => p.y > PAGE_H - E;
+  return (L(va)&&L(vb))||(R(va)&&R(vb))||(T(va)&&T(vb))||(B(va)&&B(vb));
+}
+
+// ════════════════════════════════════════════════════════════════
+// CUT FLASH ANIMATION
+// ════════════════════════════════════════════════════════════════
+
+function addCutFlash(x1, y1, x2, y2) {
+  cutFlashes.push({ x1, y1, x2, y2, born: performance.now() });
+  if (!flashRafRunning) { flashRafRunning = true; requestAnimationFrame(flashTick); }
+}
+
+function flashTick() {
+  const now = performance.now();
+  cutFlashes = cutFlashes.filter(f => now - f.born < 500);
+  render();
+  if (cutFlashes.length > 0) requestAnimationFrame(flashTick);
+  else flashRafRunning = false;
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDERING
+// ════════════════════════════════════════════════════════════════
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Cutting mat background — warm grey with faint grid
+  ctx.fillStyle = '#B0A79C';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = 'rgba(90,70,55,0.18)';
+  ctx.lineWidth = 0.5;
+  const g = 22;
+  for (let x = g; x < canvas.width; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+  for (let y = g; y < canvas.height; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+
+  if (mode === 'draw') renderDraw();
+  else                 renderScatter();
+}
+
+// Trace a face polygon as a subpath (for evenodd fill with holes)
+function traceFacePath(poly) {
+  const pts = poly.map(vi => vertices[vi]);
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+}
+
+function renderDraw() {
+  ctx.save();
+  ctx.translate(ox, oy);
+
+  // Page shadow (two passes: soft outer + sharp inner)
+  ctx.shadowColor = 'rgba(30,15,5,0.45)';
+  ctx.shadowBlur  = 28; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 5;
+  ctx.fillStyle   = '#F9F2E4';
+  ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+  ctx.shadowColor = 'transparent';
+
+  // Paper texture
+  if (paperTexture) ctx.drawImage(paperTexture, 0, 0);
+
+  // Face colour fills — evenodd punches holes for contained children
+  for (const f of faces) {
+    ctx.beginPath();
+    traceFacePath(f.poly);
+    // Punch out direct children
+    for (const child of f.directChildren) traceFacePath(child.poly);
+    ctx.fillStyle = f.color + 'CC';
+    ctx.fill('evenodd');
+  }
+
+  // Cut-edge shadow (lift effect)
+  ctx.strokeStyle = 'rgba(80,40,10,0.18)';
+  ctx.lineWidth   = 2.5;
+  for (const e of edges) {
+    const va = vertices[e.a], vb = vertices[e.b];
+    if (isBoundaryEdge(va, vb)) continue;
+    ctx.beginPath(); ctx.moveTo(va.x + 0.8, va.y + 0.8); ctx.lineTo(vb.x + 0.8, vb.y + 0.8); ctx.stroke();
+  }
+
+  // Cut lines (crisp dark)
+  ctx.strokeStyle = '#1C100A'; ctx.lineWidth = 0.9;
+  for (const e of edges) {
+    const va = vertices[e.a], vb = vertices[e.b];
+    if (isBoundaryEdge(va, vb)) continue;
+    ctx.beginPath(); ctx.moveTo(va.x, va.y); ctx.lineTo(vb.x, vb.y); ctx.stroke();
+  }
+
+  // Cut flash overlays
+  const now = performance.now();
+  for (const f of cutFlashes) {
+    const age   = (now - f.born) / 500;
+    const alpha = Math.pow(1 - age, 2);
+    const width = 2.5 - age * 1.8;
+    ctx.strokeStyle = `rgba(200,120,30,${alpha * 0.9})`;
+    ctx.lineWidth   = Math.max(0.5, width);
+    ctx.beginPath(); ctx.moveTo(f.x1, f.y1); ctx.lineTo(f.x2, f.y2); ctx.stroke();
+  }
+
+  // Piece ID labels
+  ctx.font = '9.5px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of faces) {
+    if (f.area < 280) continue;
+    ctx.fillStyle = 'rgba(30,12,5,0.32)';
+    ctx.fillText(`#${f.id}`, f.centroid.x, f.centroid.y);
+  }
+
+  // Page border
+  ctx.strokeStyle = 'rgba(100,65,30,0.30)'; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, PAGE_W - 1, PAGE_H - 1);
+
+  // ── Draw preview + snap indicator ─────────────────────────────
+  const previewFrom = firstClickPt || (isMouseDown ? mouseDownPt : null);
+  if (!mousePos) { ctx.restore(); return; }
+
+  const snapInfo  = getSnapState(mousePos);
+  const displayPt = snapInfo ? snapInfo.pt : mousePos;
+
+  // Highlight edge being snapped to
+  if (snapInfo && snapInfo.type === 'edge' && snapInfo.edgeA) {
+    ctx.strokeStyle = 'rgba(200,145,55,0.5)'; ctx.lineWidth = 2.8;
+    ctx.beginPath(); ctx.moveTo(snapInfo.edgeA.x, snapInfo.edgeA.y);
+    ctx.lineTo(snapInfo.edgeB.x, snapInfo.edgeB.y); ctx.stroke();
+  }
+
+  // Preview line
+  if (previewFrom) {
+    ctx.strokeStyle = 'rgba(80,50,20,0.55)'; ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(previewFrom.x, previewFrom.y);
+    ctx.lineTo(displayPt.x, displayPt.y); ctx.stroke();
+    ctx.setLineDash([]);
+    // Origin dot
+    ctx.fillStyle = '#6A3C18';
+    ctx.beginPath(); ctx.arc(previewFrom.x, previewFrom.y, 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Snap ring
+  const snapping = !!snapInfo;
+  ctx.strokeStyle = snapping ? '#C8913A' : 'rgba(80,50,20,0.4)';
+  ctx.lineWidth   = snapping ? 1.8 : 1;
+  ctx.beginPath(); ctx.arc(displayPt.x, displayPt.y, snapping ? 5.5 : 3, 0, Math.PI * 2); ctx.stroke();
+  if (snapping) { ctx.fillStyle = 'rgba(200,145,55,0.15)'; ctx.fill(); }
+
+  ctx.restore();
+}
+
+function renderScatter() {
+  ctx.save();
+  ctx.translate(ox, oy);
+
+  // Ghost page
+  ctx.strokeStyle = 'rgba(240,220,190,0.28)'; ctx.lineWidth = 1.2;
+  ctx.setLineDash([5, 6]); ctx.strokeRect(0, 0, PAGE_W, PAGE_H); ctx.setLineDash([]);
+
+  // Ghost piece outlines
+  for (const p of pieces) {
+    if (p.snapped) continue;
+    const pts = p.face.poly.map(vi => vertices[vi]);
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(240,220,190,0.18)'; ctx.lineWidth = 0.8; ctx.stroke();
+  }
+
+  // Snapped pieces
+  for (const p of pieces) { if (p.snapped) drawSnapped(p); }
+  ctx.restore();
+
+  // Floating pieces
+  for (const p of pieces) {
+    if (p.snapped || p === dragPiece) continue;
+    ctx.save(); ctx.translate(p.pos.x, p.pos.y); drawFloating(p, false); ctx.restore();
+  }
+  if (dragPiece && !dragPiece.snapped) {
+    ctx.save(); ctx.translate(dragPiece.pos.x, dragPiece.pos.y); drawFloating(dragPiece, true); ctx.restore();
+  }
+}
+
+function drawFloating(p, dragging) {
+  const f   = p.face;
+  const off = { x: f.centroid.x, y: f.centroid.y };
+
+  ctx.beginPath();
+  // Outer polygon (offset to centroid-relative coords)
+  const pts = f.poly.map(vi => ({ x: vertices[vi].x - off.x, y: vertices[vi].y - off.y }));
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+
+  // Punch holes for direct children (also floating → not yet snapped)
+  for (const child of f.directChildren) {
+    const childPiece = pieces.find(pc => pc.face === child);
+    if (childPiece && !childPiece.snapped) {
+      const cpts = child.poly.map(vi => ({ x: vertices[vi].x - off.x, y: vertices[vi].y - off.y }));
+      ctx.moveTo(cpts[0].x, cpts[0].y);
+      for (let i = 1; i < cpts.length; i++) ctx.lineTo(cpts[i].x, cpts[i].y);
+      ctx.closePath();
+    }
+  }
+
+  if (dragging) { ctx.shadowColor = 'rgba(20,8,0,0.35)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 8; }
+  ctx.fillStyle = f.color + 'F0';
+  ctx.fill('evenodd');
+  ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = '#2A1808'; ctx.lineWidth = dragging ? 1.2 : 0.85; ctx.stroke();
+  if (f.area > 180) {
+    ctx.fillStyle = 'rgba(25,10,5,0.35)'; ctx.font = '9px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('#' + f.id, 0, 0);
+  }
+}
+
+function drawSnapped(p) {
+  const f = p.face;
+  ctx.beginPath();
+  traceFacePath(f.poly);
+  // Punch holes for any direct children that are NOT yet snapped back
+  for (const child of f.directChildren) {
+    const childPiece = pieces.find(pc => pc.face === child);
+    if (childPiece && !childPiece.snapped) traceFacePath(child.poly);
+  }
+  ctx.fillStyle   = f.color + 'FF';
+  ctx.fill('evenodd');
+  ctx.strokeStyle = 'rgba(50,20,5,0.35)'; ctx.lineWidth = 0.6; ctx.stroke();
+}
+
+// ════════════════════════════════════════════════════════════════
+// INPUT HELPERS
+// ════════════════════════════════════════════════════════════════
+
+function getPagePt(e) {
+  const r = canvas.getBoundingClientRect();
+  const sx = canvas.width / r.width, sy = canvas.height / r.height;
+  return { x: (e.clientX - r.left) * sx - ox, y: (e.clientY - r.top) * sy - oy };
+}
+
+function getCanvasPt(e) {
+  const r = canvas.getBoundingClientRect();
+  const sx = canvas.width / r.width, sy = canvas.height / r.height;
+  return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
+}
+
+// ════════════════════════════════════════════════════════════════
+// DRAW MODE EVENTS
+// ════════════════════════════════════════════════════════════════
+
+canvas.addEventListener('mousedown', e => {
+  e.preventDefault();
+  if (mode === 'draw') {
+    mouseDownPt = snapPoint(clampPage(getPagePt(e)));
+    isMouseDown = true; render();
+  } else {
+    startDrag(e);
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (mode === 'draw') {
+    mousePos = clampPage(getPagePt(e)); render();
+  } else if (dragPiece) {
+    const cp = getCanvasPt(e);
+    dragPiece.pos.x = cp.x - dragOff.x;
+    dragPiece.pos.y = cp.y - dragOff.y;
+    render();
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (mode === 'draw') {
+    const finalPt = snapPoint(clampPage(getPagePt(e)));
+    const moved   = mouseDownPt ? dist(finalPt, mouseDownPt) : 0;
+
+    if (moved > 8) {
+      // Drag gesture → immediate segment
+      if (dist(finalPt, mouseDownPt) > MIN_LEN) commitSegment(mouseDownPt, finalPt);
+      firstClickPt = null;
+    } else {
+      // Click gesture → two-click mode
+      if (!firstClickPt) {
+        firstClickPt = snapPoint(mouseDownPt || finalPt);
+      } else {
+        if (dist(finalPt, firstClickPt) > MIN_LEN) commitSegment(firstClickPt, finalPt);
+        firstClickPt = null;
+      }
+    }
+    mouseDownPt = null; isMouseDown = false; render();
+  } else if (dragPiece) {
+    trySnap(dragPiece); dragPiece = null;
+    canvas.style.cursor = 'grab'; render();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (mode === 'draw') { mousePos = null; render(); }
+});
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  firstClickPt = mouseDownPt = null; isMouseDown = false; render();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { firstClickPt = mouseDownPt = null; isMouseDown = false; render(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); doUndo(); }
+});
+
+function commitSegment(from, to) {
+  segments.push({ x1: from.x, y1: from.y, x2: to.x, y2: to.y });
+  addCutFlash(from.x, from.y, to.x, to.y);
+  playSnip();
+  rebuild();
+}
+
+// ════════════════════════════════════════════════════════════════
+// SCATTER / REASSEMBLE
+// ════════════════════════════════════════════════════════════════
+
+
+function startDrag(e) {
+  const cp = getCanvasPt(e);
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    const p = pieces[i];
+    if (p.snapped) continue;
+    const local = { x: cp.x - p.pos.x, y: cp.y - p.pos.y };
+    const pts   = p.face.poly.map(vi => ({
+      x: vertices[vi].x - p.face.centroid.x,
+      y: vertices[vi].y - p.face.centroid.y,
+    }));
+    if (polyContainsPt(pts, local)) {
+      dragPiece = p; dragOff = { x: cp.x - p.pos.x, y: cp.y - p.pos.y };
+      pieces.splice(i, 1); pieces.push(p);
+      canvas.style.cursor = 'grabbing'; break;
+    }
+  }
+}
+
+function enterScatter() {
+  mode = 'scatter'; scSnapped = 0;
+  canvas.style.cursor = 'grab';
+  document.getElementById('solved-msg').style.display = 'none';
+
+  pieces = faces.map(f => ({
+    face: f,
+    pos:     { x: f.centroid.x + ox, y: f.centroid.y + oy },
+    origPos: { x: f.centroid.x + ox, y: f.centroid.y + oy },
+    snapped: false,
+  }));
+
+  const CX = canvas.width / 2, CY = canvas.height / 2;
+  const R  = Math.min(canvas.width, canvas.height) * 0.38;
+  pieces.forEach((p, i) => {
+    const ang = (i / pieces.length) * Math.PI * 2 + (Math.random() - 0.5) * 1.2;
+    const r   = R * (0.42 + Math.random() * 0.58);
+    animateTo(p, CX + Math.cos(ang) * r, CY + Math.sin(ang) * r, 360 + i * 30);
+  });
+
+  El('btn-draw').classList.remove('active');
+  El('btn-scatter').style.display = 'none';
+  El('btn-back').style.display    = 'inline-block';
+  El('sidebar').style.display     = 'none';
+  setHint('Drag pieces back to their ghost outlines');
+}
+
+function exitScatter() {
+  mode = 'draw'; pieces = []; dragPiece = null; scSnapped = 0;
+  canvas.style.cursor = DRAW_CURSOR;
+  El('btn-draw').classList.add('active');
+  El('btn-scatter').style.display = 'inline-block';
+  El('btn-back').style.display    = 'none';
+  El('sidebar').style.display     = 'flex';
+  El('solved-msg').style.display  = 'none';
+  setHint(DRAW_HINT);
+  render();
+}
+
+function trySnap(piece) {
+  if (dist(piece.pos, piece.origPos) < SCATTER_SD) {
+    animateTo(piece, piece.origPos.x, piece.origPos.y, 130, () => { piece.snapped = true; render(); });
+    piece.snapped = true; scSnapped++;
+    if (scSnapped >= pieces.length) {
+      setTimeout(() => { El('solved-msg').style.display = 'block'; }, 250);
+      setHint('');
+    } else {
+      setHint(`${scSnapped} / ${pieces.length} placed`);
+    }
+  }
+}
+
+function animateTo(piece, tx, ty, dur, onDone) {
+  const sx = piece.pos.x, sy = piece.pos.y, t0 = performance.now();
+  const tick = now => {
+    const t = Math.min((now - t0) / dur, 1);
+    const e = 1 - Math.pow(1 - t, 3);
+    piece.pos.x = sx + (tx - sx) * e; piece.pos.y = sy + (ty - sy) * e;
+    render();
+    if (t < 1) requestAnimationFrame(tick); else if (onDone) onDone();
+  };
+  requestAnimationFrame(tick);
+}
+
+// ════════════════════════════════════════════════════════════════
+// FULL RESET — clears ALL state coherently
+// ════════════════════════════════════════════════════════════════
+
+function fullReset() {
+  // 1. Force-exit scatter without animation
+  mode = 'draw'; pieces = []; dragPiece = null; scSnapped = 0;
+
+  // 2. Clear all geometry
+  segments = []; colorCache = {};
+
+  // 3. Clear draw interaction state
+  firstClickPt = mouseDownPt = null; isMouseDown = false; mousePos = null;
+
+  // 4. Clear flash animations
+  cutFlashes = []; flashRafRunning = false;
+
+  // 5. Reset toolbar to draw-mode state
+  canvas.style.cursor = DRAW_CURSOR;
+  El('btn-draw').classList.add('active');
+  El('btn-scatter').style.display = 'inline-block';
+  El('btn-back').style.display    = 'none';
+  El('sidebar').style.display     = 'flex';
+  El('solved-msg').style.display  = 'none';
+  setHint(DRAW_HINT);
+
+  // 6. Rebuild geometry + update sidebar/toolbar + render
+  rebuild();
+}
+
+// ════════════════════════════════════════════════════════════════
+// TOOLBAR / SIDEBAR / HUD
+// ════════════════════════════════════════════════════════════════
+
+function syncUI() {
+  const n = faces.length;
+  El('btn-undo').disabled    = segments.length === 0 || mode === 'scatter';
+  El('btn-scatter').disabled = n < 2 || mode === 'scatter';
+  El('status').textContent   = n <= 1 ? 'no cuts' : `${n} pieces`;
+  updateSidebar();
+}
+
+function updateSidebar() {
+  const list = El('pieces-list');
+  list.innerHTML = '';
+  for (const f of faces) {
+    const row      = document.createElement('div');
+    row.className  = 'piece-row';
+    const areaTxt  = f.area > 9999 ? (f.area / 1000).toFixed(1) + 'k' : Math.round(f.area).toLocaleString();
+    row.innerHTML = `
+      <div class="piece-swatch" style="background:${f.color}"></div>
+      <span class="piece-id">#${String(f.id).padStart(2, '0')}</span>
+      <span class="piece-area">${areaTxt}</span>
+    `;
+    list.appendChild(row);
+  }
+}
+
+function setHint(txt) {
+  const el = El('hint');
+  el.textContent  = txt;
+  el.style.opacity = txt ? '1' : '0';
+}
+
+function El(id) { return document.getElementById(id); }
+
+function doUndo() {
+  if (!segments.length || mode === 'scatter') return;
+  segments.pop();
+  rebuild();
+}
+
+// ── Button listeners ───────────────────────────────────────────
+El('btn-draw').addEventListener('click',    () => { if (mode === 'scatter') exitScatter(); });
+El('btn-back').addEventListener('click',    exitScatter);
+El('btn-undo').addEventListener('click',    doUndo);
+El('btn-clear').addEventListener('click',   fullReset);
+El('btn-scatter').addEventListener('click', () => { if (faces.length >= 2) enterScatter(); });
+
+// ════════════════════════════════════════════════════════════════
+// RESIZE + INIT
+// ════════════════════════════════════════════════════════════════
+
+function resize() {
+  const area   = El('canvas-area');
+  canvas.width  = area.clientWidth;
+  canvas.height = area.clientHeight;
+  const newOx   = Math.round((canvas.width  - PAGE_W) / 2);
+  const newOy   = Math.round((canvas.height - PAGE_H) / 2);
+
+  // In scatter mode, origPos is absolute canvas coords → update when canvas shifts
+  if (mode === 'scatter' && pieces.length > 0) {
+    const dox = newOx - ox, doy = newOy - oy;
+    for (const p of pieces) {
+      p.origPos.x += dox; p.origPos.y += doy;
+      if (!p.snapped) { p.pos.x += dox; p.pos.y += doy; }
+    }
+  }
+
+  ox = newOx; oy = newOy;
+  render();
+}
+
+window.addEventListener('resize', resize);
+
+// Init
+paperTexture = buildPaperTexture();
+canvas.style.cursor = DRAW_CURSOR;
+setHint(DRAW_HINT);
+resize();
+rebuild();
+</script>
+</body>
+</html>

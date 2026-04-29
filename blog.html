@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f8f5ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<title>Paper Cuts — A DSA Problem Worth Thinking About</title>
+<meta name="description" content="A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions about planar subdivision, PSLG, and DCEL.">
+<meta name="author" content="@omkar_builds">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="Paper Cuts — A DSA Problem Worth Thinking About">
+<meta property="og:description" content="A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions.">
+<meta property="og:site_name" content="omkar_builds">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:creator" content="@omkar_builds">
+<meta name="twitter:title" content="Paper Cuts — A DSA Problem Worth Thinking About">
+<meta name="twitter:description" content="A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1714;
+    --ink-light: #5a5650;
+    --paper: #f8f5ef;
+    --paper-dark: #ede9e0;
+    --paper-card: #ffffff;
+    --red: #c0392b;
+    --red-pale: #f9eded;
+    --blue: #1a4a7a;
+    --blue-pale: #eaf0f8;
+    --border: rgba(26,23,20,0.12);
+    --code-bg: #1a1714;
+    --code-fg: #e8e4db;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #ece6db;
+      --ink-light: #a89f90;
+      --paper: #14110e;
+      --paper-dark: #1f1b16;
+      --paper-card: #1a1714;
+      --red: #e87060;
+      --red-pale: rgba(232,112,96,0.10);
+      --blue: #7aa9d4;
+      --blue-pale: rgba(122,169,212,0.10);
+      --border: rgba(236,230,219,0.14);
+      --code-bg: #0d0b09;
+      --code-fg: #e8e4db;
+    }
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-weight: 300;
+    line-height: 1.75;
+    font-size: clamp(16px, 1rem + 0.15vw, 18px);
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* scroll progress bar */
+  .progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: transparent;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 0;
+    background: var(--red);
+    transition: width 0.08s linear;
+  }
+
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 2rem) clamp(3rem, 8vw, 5rem);
+  }
+
+  /* header */
+  .kicker {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .kicker::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--red);
+    opacity: 0.3;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.9rem, 1.4rem + 2.5vw, 2.8rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.5rem;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
+  .subtitle {
+    font-size: clamp(1rem, 0.95rem + 0.4vw, 1.15rem);
+    color: var(--ink-light);
+    font-style: italic;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+  }
+
+  .byline {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink-light);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 0.6rem 0;
+    margin-bottom: 2.5rem;
+    display: flex;
+    gap: 0.4rem 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .byline > span {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+  .byline > span:not(:last-child)::after {
+    content: '·';
+    margin: 0 0.9rem;
+    opacity: 0.4;
+  }
+  .byline a {
+    color: var(--ink-light);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--border);
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+  .byline a:hover, .byline a:focus-visible {
+    color: var(--red);
+    border-bottom-color: var(--red);
+    outline: none;
+  }
+
+  /* body */
+  p { margin-bottom: 1.2rem; overflow-wrap: break-word; }
+  em { font-style: italic; }
+
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.3rem, 1.05rem + 1vw, 1.55rem);
+    font-weight: 700;
+    margin: 2.5rem 0 0.8rem;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    scroll-margin-top: 1rem;
+  }
+
+  h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin: 2rem 0 0.6rem;
+    scroll-margin-top: 1rem;
+  }
+
+  code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82em;
+    background: var(--paper-dark);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--blue);
+    word-break: break-word;
+  }
+
+  pre {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: clamp(0.74rem, 0.7rem + 0.25vw, 0.82rem);
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: clamp(0.9rem, 2vw, 1.2rem) clamp(1rem, 2.5vw, 1.4rem);
+    border-radius: 6px;
+    overflow-x: auto;
+    line-height: 1.6;
+    margin: 1.2rem 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+  }
+  pre .c { color: #888; }
+  pre .k { color: #f0a070; }
+  pre .s { color: #a8d8a8; }
+  pre .n { color: #88ccff; }
+
+  /* diagram containers */
+  .diagram-wrap {
+    margin: 2rem 0;
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: clamp(0.9rem, 2.5vw, 1.5rem);
+  }
+  .diagram-wrap svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+  .diagram-caption {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-light);
+    text-align: center;
+    margin-top: 0.8rem;
+    letter-spacing: 0.05em;
+  }
+  .diagram-row {
+    display: flex;
+    gap: clamp(0.8rem, 2vw, 1.5rem);
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .diagram-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .arrow-step {
+    display: flex;
+    align-items: center;
+    font-size: 1.5rem;
+    color: var(--ink-light);
+    opacity: 0.5;
+    padding-top: 50px;
+  }
+  .arrow-step::before { content: '→'; }
+
+  /* 3-cut composite block */
+  .three-cut-block {
+    margin-top: 1.5rem;
+    border-top: 1px dashed var(--border);
+    padding-top: 1.2rem;
+  }
+  .three-cut-caption {
+    text-align: center;
+    margin-bottom: 0.8rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-light);
+  }
+  .three-cut-row {
+    align-items: flex-start;
+  }
+  .three-cut-prose {
+    flex: 1 1 220px;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--ink-light);
+  }
+  .three-cut-prose .last { margin-bottom: 0; }
+  .emph-strong { font-style: italic; color: var(--ink); font-weight: 400; }
+  .emph-strong-plain { color: var(--ink); font-weight: 400; }
+
+  /* PSLG diagram row */
+  .pslg-row {
+    display: flex;
+    gap: clamp(0.6rem, 2vw, 2rem);
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* numbered list */
+  .numbered-list {
+    margin: 0.8rem 0 1rem 1.5rem;
+    line-height: 2;
+  }
+
+  /* learning pills row */
+  .learning-pills {
+    margin: 1rem 0 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* tags block */
+  .tags-block { margin: 2rem 0; }
+  .tags-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-bottom: 0.8rem;
+  }
+
+  .cta-sub {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    color: var(--ink-light);
+  }
+  .cta-sub a {
+    color: var(--ink-light);
+    border-bottom: 1px dashed var(--border);
+    text-decoration: none;
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+  .cta-sub a:hover, .cta-sub a:focus-visible {
+    color: var(--red);
+    border-bottom-color: var(--red);
+    outline: none;
+  }
+  .diagram-item .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-light);
+    letter-spacing: 0.05em;
+  }
+
+  /* callout boxes */
+  .callout {
+    border-left: 3px solid var(--red);
+    background: var(--red-pale);
+    padding: 1rem 1.2rem;
+    margin: 1.5rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.95rem;
+  }
+  .callout.blue {
+    border-left-color: var(--blue);
+    background: var(--blue-pale);
+  }
+  .callout strong {
+    font-weight: 400;
+    font-style: italic;
+  }
+
+  /* question list */
+  .q-list {
+    list-style: none;
+    margin: 1rem 0 1.5rem;
+    padding: 0;
+  }
+  .q-list li {
+    padding: 0.65rem 0.8rem 0.65rem 1rem;
+    border-left: 2px solid var(--border);
+    margin-bottom: 0.5rem;
+    font-size: 0.97rem;
+    transition: border-color 0.2s;
+    position: relative;
+  }
+  .q-list li::before {
+    content: attr(data-n);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--red);
+    position: absolute;
+    left: -1.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .q-list li:hover { border-left-color: var(--red); }
+  .q-q { font-weight: 400; display: block; }
+  .q-hint { font-size: 0.83rem; color: var(--ink-light); font-style: italic; display: block; margin-top: 2px; }
+
+  /* learning pill */
+  .learning {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--paper-dark);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 3px 12px 3px 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink);
+    margin: 3px;
+  }
+  .learning-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+    flex-shrink: 0;
+  }
+
+  .learning-section {
+    background: var(--paper-dark);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem 1.4rem;
+    margin: 1.5rem 0;
+  }
+  .learning-section h4 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.8rem;
+  }
+  .learning-section p {
+    font-size: 0.93rem;
+    margin-bottom: 0.6rem;
+    color: var(--ink-light);
+  }
+  .learning-section p:last-child { margin-bottom: 0; }
+
+  /* footer cta */
+  .cta {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--ink);
+    display: flex;
+    align-items: flex-start;
+    gap: 1.2rem;
+  }
+  .cta-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .cta-text { font-size: clamp(1rem, 0.95rem + 0.4vw, 1.1rem); line-height: 1.6; }
+  .cta-text strong { font-style: italic; font-weight: 400; }
+
+  .tag {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    margin: 2px;
+    letter-spacing: 0.03em;
+  }
+
+  /* sub-page nav (back to home) */
+  .subnav {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 1.2rem clamp(1rem, 4vw, 2rem) 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    color: var(--ink-light);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .subnav a {
+    color: var(--ink-light);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--border);
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+  .subnav a:hover, .subnav a:focus-visible {
+    color: var(--red);
+    border-bottom-color: var(--red);
+    outline: none;
+  }
+  .subnav .subnav-sep { opacity: 0.4; }
+
+  /* page footer */
+  .page-footer {
+    margin-top: 3.5rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-light);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem 1.2rem;
+  }
+  .page-footer a {
+    color: var(--ink-light);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--border);
+    transition: color 0.18s ease, border-color 0.18s ease;
+  }
+  .page-footer a:hover, .page-footer a:focus-visible {
+    color: var(--red);
+    border-bottom-color: var(--red);
+    outline: none;
+  }
+  .page-footer .twitter-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .page-footer .twitter-cta svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+
+  /* focus styles for keyboard navigation */
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--red);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* animated scissors on title */
+  @keyframes snip {
+    0%, 100% { transform: rotate(-5deg); }
+    50% { transform: rotate(8deg); }
+  }
+  .snip { display: inline-block; animation: snip 2.4s ease-in-out infinite; transform-origin: bottom center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    html { scroll-behavior: auto; }
+  }
+
+  /* tablet */
+  @media (max-width: 768px) {
+    .diagram-row { gap: 1rem; }
+    .cta { gap: 0.9rem; }
+    .cta-icon { font-size: 2rem; }
+  }
+
+  /* phone */
+  @media (max-width: 600px) {
+    .byline { font-size: 11px; }
+    .byline > span:not(:last-child)::after { margin: 0 0.6rem; }
+
+    .diagram-wrap { padding: 1rem 0.7rem; }
+    .pslg-row { flex-direction: column; align-items: center; }
+    .three-cut-row { flex-direction: column; align-items: center; }
+    .three-cut-prose { text-align: center; }
+    .arrow-step {
+      padding: 0;
+      margin: 0.1rem 0;
+      font-size: 1.3rem;
+      opacity: 0.6;
+    }
+    .diagram-wrap .arrow-step::before { content: '↓'; }
+    .q-list li::before { left: -0.9rem; }
+    .cta { flex-direction: column; gap: 0.6rem; padding-top: 1.2rem; }
+    .cta-icon { font-size: 1.8rem; }
+
+    .page-footer { font-size: 11px; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  }
+
+  /* very small phones */
+  @media (max-width: 380px) {
+    .page { padding: 1.2rem 0.9rem 2.5rem; }
+    .kicker { font-size: 10px; letter-spacing: 0.14em; }
+    .q-list { padding-left: 1rem; }
+    .q-list li { font-size: 0.92rem; }
+    pre { font-size: 0.7rem; padding: 0.8rem 0.9rem; }
+  }
+
+  /* print — clean readable output */
+  @media print {
+    :root { --paper: #fff; --paper-card: #fff; --paper-dark: #f3f0e9; }
+    body { font-size: 11pt; color: #000; background: #fff; }
+    .progress, .snip { display: none; }
+    pre, .diagram-wrap, .callout, .learning-section { break-inside: avoid; }
+    h1, h2, h3 { break-after: avoid; }
+    a { color: #000; text-decoration: underline; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+
+<nav class="subnav" aria-label="Site navigation">
+  <a href="index.html">← Paper Cuts</a>
+  <span class="subnav-sep" aria-hidden="true">·</span>
+  <a href="game.html">play the game</a>
+</nav>
+
+<article class="page">
+
+  <header>
+    <div class="kicker">DSA · Computational Geometry · Open Problem</div>
+
+    <h1>Paper Cuts <span class="snip" aria-hidden="true">✂</span></h1>
+    <p class="subtitle">A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions.</p>
+    <div class="byline">
+      <span><a href="https://twitter.com/omkar_builds" rel="author noopener" target="_blank">@omkar_builds</a></span>
+      <span><time datetime="2026-04-29">April 2026</time></span>
+      <span>~10 min read</span>
+      <span>#DSA #CompGeo #TryItYourself</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════ ORIGIN ═══════════════════════════ -->
+
+  <h2>It started with a movie scene.</h2>
+
+  <p>You know that trope — someone feeds a stack of documents into a shredder. Long strips of paper rain down. Then, in the next scene, a forensics team (or some obsessive CS guy) reconstructs the original pages from those strips.</p>
+
+  <p>The CS version of that is actually a real problem: given a set of rectangular strips with known widths and edge features, reconstruct the original document. People have built solvers for it. It's basically a constrained jigsaw puzzle with a known shape vocabulary.</p>
+
+  <p>But I started wondering about a different direction. Not <em>reconstruction</em>, but <em>decomposition</em>. What if instead of strips, we had arbitrary straight cuts? And instead of asking "reassemble this," we asked more fundamental questions first — about how you even <em>represent</em> the problem?</p>
+
+  <p>This is what I'm calling <strong>Paper Cuts</strong>.</p>
+
+  <!-- ═══════════════════════════ EXAMPLE ═══════════════════════════ -->
+
+  <h2>Let's start concrete. A square page.</h2>
+
+  <p>Take a unit square — the page is <code>[0,1] × [0,1]</code>. Now make some straight cuts. Each cut goes all the way across (for now). Here's what we're dealing with:</p>
+
+  <div class="diagram-wrap">
+    <div class="diagram-row">
+      <!-- Step 0: blank square -->
+      <div class="diagram-item">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <rect x="15" y="15" width="110" height="110" fill="#fafaf8" stroke="#1a1714" stroke-width="1.5"/>
+          <!-- corner tick marks -->
+          <text x="70" y="80" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="11" fill="#aaa">page</text>
+        </svg>
+        <span class="label">① blank page</span>
+      </div>
+
+      <!-- Step 1: one horizontal cut -->
+      <div class="diagram-item">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <rect x="15" y="15" width="110" height="110" fill="#fafaf8" stroke="#1a1714" stroke-width="1.5"/>
+          <!-- cut line -->
+          <line x1="15" y1="70" x2="125" y2="70" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <!-- point labels -->
+          <circle cx="15" cy="70" r="3" fill="#c0392b"/>
+          <circle cx="125" cy="70" r="3" fill="#c0392b"/>
+          <text x="5" y="73" text-anchor="end" font-family="IBM Plex Mono,monospace" font-size="9" fill="#c0392b">A</text>
+          <text x="132" y="73" font-family="IBM Plex Mono,monospace" font-size="9" fill="#c0392b">B</text>
+          <text x="70" y="50" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#888">y=0.5</text>
+        </svg>
+        <span class="label">② one cut → 2 pieces</span>
+      </div>
+
+      <!-- Step 2: two cuts, 4 pieces -->
+      <div class="diagram-item">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <!-- 4 colored regions -->
+          <rect x="15" y="15" width="55" height="55" fill="rgba(26,74,122,0.08)"/>
+          <rect x="70" y="15" width="55" height="55" fill="rgba(192,57,43,0.07)"/>
+          <rect x="15" y="70" width="55" height="55" fill="rgba(192,57,43,0.07)"/>
+          <rect x="70" y="70" width="55" height="55" fill="rgba(26,74,122,0.08)"/>
+          <!-- border -->
+          <rect x="15" y="15" width="110" height="110" fill="none" stroke="#1a1714" stroke-width="1.5"/>
+          <!-- cuts -->
+          <line x1="15" y1="70" x2="125" y2="70" stroke="#c0392b" stroke-width="1.2"/>
+          <line x1="70" y1="15" x2="70" y2="125" stroke="#1a4a7a" stroke-width="1.2"/>
+          <!-- intersection -->
+          <circle cx="70" cy="70" r="3.5" fill="white" stroke="#888" stroke-width="1"/>
+          <!-- piece labels -->
+          <text x="42" y="47" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#1a4a7a">R₁</text>
+          <text x="97" y="47" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#c0392b">R₂</text>
+          <text x="42" y="98" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#c0392b">R₃</text>
+          <text x="97" y="98" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#1a4a7a">R₄</text>
+        </svg>
+        <span class="label">③ two cuts → 4 pieces</span>
+      </div>
+
+      <!-- Step 3: diagonal cut, irregular pieces -->
+      <div class="diagram-item">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <!-- 3 colored regions (polygon clipping) -->
+          <!-- region above diagonal: top-left triangle -->
+          <polygon points="15,15 125,15 125,50 15,125" fill="rgba(26,74,122,0.09)"/>
+          <!-- bottom-right triangle -->
+          <polygon points="125,50 125,125 15,125" fill="rgba(192,57,43,0.09)"/>
+          <!-- border -->
+          <rect x="15" y="15" width="110" height="110" fill="none" stroke="#1a1714" stroke-width="1.5"/>
+          <!-- diagonal cut -->
+          <line x1="15" y1="125" x2="125" y2="50" stroke="#666" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <circle cx="15" cy="125" r="3" fill="#666"/>
+          <circle cx="125" cy="50" r="3" fill="#666"/>
+          <text x="42" y="50" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1a4a7a">R₁</text>
+          <text x="95" y="105" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#c0392b">R₂</text>
+        </svg>
+        <span class="label">④ diagonal cut → 2 pieces</span>
+      </div>
+    </div>
+
+    <!-- 3-cut complex example -->
+    <div class="three-cut-block">
+      <div class="three-cut-caption">
+        <span>now things get interesting — 3 cuts in general position</span>
+      </div>
+      <div class="diagram-row three-cut-row">
+        <!--
+          Square: (20,20) to (180,180).
+          Cut H: horizontal y=90,  endpoints (20,90) and (180,90).
+          Cut V: vertical   x=110, endpoints (110,20) and (110,180).
+          Cut D: diagonal from (20,140) to (180,60).
+
+          Intersection arithmetic (parametric D: x=20+160t, y=140-80t):
+            H ∩ V = (110, 90)
+            H ∩ D: y=90 → 140-80t=90 → t=5/8 → x=20+100=120  →  (120, 90)
+            V ∩ D: x=110 → 20+160t=110 → t=9/16 → y=140-45=95  →  (110, 95)
+
+          7 regions (3 cuts in general position on a bounded rectangle):
+            R1  top-left rectangle         (20,20)-(110,20)-(110,90)-(20,90)
+            R2  top-right, above diagonal  (110,20)-(180,20)-(180,60)-(120,90)-(110,90)
+            R3  small triangle TR          (120,90)-(180,60)-(180,90)
+            R4  thin quad BL, above diag   (20,90)-(110,90)-(110,95)-(20,140)
+            R5  tiny central triangle      (110,90)-(120,90)-(110,95)
+            R6  large bottom-right         (120,90)-(180,90)-(180,180)-(110,180)-(110,95)
+            R7  bottom-left, below diag    (20,140)-(110,95)-(110,180)-(20,180)
+        -->
+        <svg width="210" height="215" viewBox="0 0 210 215">
+          <!-- ── Colored regions (drawn first, under cut lines) ── -->
+          <!-- R1: top-left rectangle -->
+          <polygon points="20,20 110,20 110,90 20,90" fill="rgba(26,74,122,0.13)"/>
+          <!-- R2: top-right above diagonal -->
+          <polygon points="110,20 180,20 180,60 120,90 110,90" fill="rgba(15,110,86,0.13)"/>
+          <!-- R3: small triangle top-right, below diagonal, above horizontal -->
+          <polygon points="120,90 180,60 180,90" fill="rgba(192,57,43,0.22)"/>
+          <!-- R4: thin quad bottom-left, between horizontal (top) and diagonal (bottom) -->
+          <polygon points="20,90 110,90 110,95 20,140" fill="rgba(186,117,23,0.18)"/>
+          <!-- R5: tiny central triangle bounded by H, V, and diagonal -->
+          <polygon points="110,90 120,90 110,95" fill="rgba(83,74,183,0.28)"/>
+          <!-- R6: large bottom-right -->
+          <polygon points="120,90 180,90 180,180 110,180 110,95" fill="rgba(59,109,17,0.13)"/>
+          <!-- R7: bottom-left, below diagonal -->
+          <polygon points="20,140 110,95 110,180 20,180" fill="rgba(136,135,128,0.18)"/>
+
+          <!-- ── Page border ── -->
+          <rect x="20" y="20" width="160" height="160" fill="none" stroke="#1a1714" stroke-width="1.5"/>
+
+          <!-- ── Cut lines (drawn on top of regions) ── -->
+          <!-- Cut H: horizontal y=90, red -->
+          <line x1="20" y1="90" x2="180" y2="90" stroke="#c0392b" stroke-width="1.4"/>
+          <!-- Cut V: vertical x=110, blue -->
+          <line x1="110" y1="20" x2="110" y2="180" stroke="#1a4a7a" stroke-width="1.4"/>
+          <!-- Cut D: diagonal (20,140)→(180,60), gray dashed -->
+          <line x1="20" y1="140" x2="180" y2="60" stroke="#666" stroke-width="1.4" stroke-dasharray="5 3"/>
+
+          <!-- ── Intersection nodes (3 nodes, all correct) ── -->
+          <!-- H ∩ V = (110, 90) -->
+          <circle cx="110" cy="90" r="4" fill="white" stroke="#1a1714" stroke-width="1.5"/>
+          <!-- H ∩ D = (120, 90) -->
+          <circle cx="120" cy="90" r="3.5" fill="white" stroke="#666" stroke-width="1.5"/>
+          <!-- V ∩ D = (110, 95) -->
+          <circle cx="110" cy="95" r="3.5" fill="white" stroke="#666" stroke-width="1.5"/>
+
+          <!-- ── Region labels ── -->
+          <text x="65" y="57" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="11" fill="#1a4a7a">R₁</text>
+          <text x="142" y="53" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#0f6e56">R₂</text>
+          <text x="158" y="81" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#993c1d">R₃</text>
+          <text x="60" y="110" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="10" fill="#ba7517">R₄</text>
+          <text x="113" y="93" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="8" fill="#534ab7">R₅</text>
+          <text x="150" y="138" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="11" fill="#3b6d11">R₆</text>
+          <text x="60" y="155" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="11" fill="#5f5e5a">R₇</text>
+
+          <!-- ── Intersection node key ── -->
+          <text x="105" y="208" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#888">7 regions · 3 intersection nodes</text>
+        </svg>
+
+        <div class="three-cut-prose">
+          <p>3 cuts in <em>general position</em> (no two parallel, no three concurrent) on a bounded rectangle produce <strong class="emph-strong">7 regions</strong>.</p>
+          <p>Each new cut that crosses <em>k</em> existing cuts adds exactly <em>k+1</em> new regions. So: 1 cut → 2, 2 cuts (crossing) → 4, 3 cuts (each crossing both others) → 4+3 = 7.</p>
+          <p class="last">The formula for <em>n</em> cuts in general position is <code>1 + n + n(n–1)/2</code>. For n=3 that's <strong class="emph-strong-plain">7</strong>. Notice R₅ — the tiny central triangle — only exists because all three cuts meet in a cluster, not a single point.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="diagram-caption">fig. 1 — increasing cut complexity on a unit square. cuts shown as colored lines; intersection nodes as hollow circles.</p>
+  </div>
+
+  <!-- ═══════════════════════════ PROBLEM STATEMENT ═══════════════════════════ -->
+
+  <h2>Okay, so what's the actual problem?</h2>
+
+  <p>Here's a rough first-pass formulation. Treat it as a sketch, not a spec — the interesting part is all the design questions hiding inside it.</p>
+
+  <pre><span class="c">// Paper Cuts — Problem Statement v0.1</span>
+
+<span class="k">Input:</span>
+  <span class="n">page</span>   → a rectangle (e.g. unit square [0,1]×[0,1])
+  <span class="n">cuts</span>   → a set of line segments, each defined by
+           two points on the boundary of the page
+
+<span class="k">Output:</span>
+  a set of <span class="n">regions</span> (polygons) such that:
+    • every point on the page belongs to exactly one region
+    • no region is split by any cut
+    • the union of all regions = the original page
+
+<span class="k">Constraints:</span>
+  ??? ← <span class="s">this is where it gets interesting</span></pre>
+
+  <p>Those <code>???</code> are doing a lot of work. Let's unpack them.</p>
+
+  <!-- ═══════════════════════════ DESIGN QUESTIONS ═══════════════════════════ -->
+
+  <h2>The design questions.</h2>
+
+  <p>Before you think about the algorithm, you have to answer a bunch of representational questions. I've been sitting with these for a while and they're genuinely non-trivial:</p>
+
+  <h3>1 · Input Representation</h3>
+  <ul class="q-list">
+    <li data-n="Q1">
+      <span class="q-q">Do cuts always span the full width/height of the page?</span>
+      <span class="q-hint">If yes, every cut can be represented as a single boundary-to-boundary line. If no, you have partial cuts — and suddenly half-cuts become their own thing.</span>
+    </li>
+    <li data-n="Q2">
+      <span class="q-q">Are cuts defined by two boundary points, or by a line equation?</span>
+      <span class="q-hint">Two points is more concrete but has precision issues. A line equation is clean mathematically but less intuitive as input.</span>
+    </li>
+    <li data-n="Q3">
+      <span class="q-q">Can two cuts share an endpoint on the boundary?</span>
+      <span class="q-hint">A "fan" of cuts from one corner point. Is that valid? How does your structure handle coincident boundary nodes?</span>
+    </li>
+  </ul>
+
+  <h3>2 · Duplicates and Degeneracies</h3>
+  <ul class="q-list">
+    <li data-n="Q4">
+      <span class="q-q">Do duplicate cuts (same line, listed twice) cause issues?</span>
+      <span class="q-hint">A robust solution should be idempotent — cutting along the same line twice shouldn't produce zero-width regions or explode.</span>
+    </li>
+    <li data-n="Q5">
+      <span class="q-q">What about three cuts that all meet at a single interior point?</span>
+      <span class="q-hint">In PSLG theory this is a vertex of degree 6. Some algorithms need special-casing for this. Do you?</span>
+    </li>
+    <li data-n="Q6">
+      <span class="q-q">Are collinear cuts (one cut extending another) allowed?</span>
+      <span class="q-hint">This one is sneaky. Two collinear segments effectively form one cut — but your input doesn't say that explicitly.</span>
+    </li>
+  </ul>
+
+  <h3>3 · Output Representation</h3>
+  <ul class="q-list">
+    <li data-n="Q7">
+      <span class="q-q">How do you represent a region?</span>
+      <span class="q-hint">Ordered list of vertices? Half-edge structure? Something else? The answer affects how you check adjacency, compute area, or re-assemble later.</span>
+    </li>
+    <li data-n="Q8">
+      <span class="q-q">Should adjacent regions share edge objects, or each have their own copy?</span>
+      <span class="q-hint">Shared edges = DCEL (Doubly Connected Edge List). Two copies = simpler to build, but you lose adjacency info. Which matters for your use case?</span>
+    </li>
+    <li data-n="Q9">
+      <span class="q-q">What's the canonical ordering of regions in the output?</span>
+      <span class="q-hint">By area? By top-left corner? This determines whether two "equivalent" decompositions compare equal — which matters a lot if you want to test or hash solutions.</span>
+    </li>
+  </ul>
+
+  <h3>4 · Rotations and Equivalence</h3>
+  <ul class="q-list">
+    <li data-n="Q10">
+      <span class="q-q">Are two cut sets "equivalent" if one is a rotation of the other?</span>
+      <span class="q-hint">Rotating the page 90° before cutting gives different coordinate sets but the same physical result. Do you care?</span>
+    </li>
+    <li data-n="Q11">
+      <span class="q-q">Should piece shapes be compared up to rotation, reflection, or translation?</span>
+      <span class="q-hint">This is the reassembly variant — if you want to later solve "given pieces, reconstruct the page," you definitely need a canonical piece representation that's invariant to rigid transforms.</span>
+    </li>
+  </ul>
+
+  <!-- ═══════════════════════════ GRAPH FRAMING ═══════════════════════════ -->
+
+  <h2>One way to think about it: a planar graph</h2>
+
+  <p>Here's the framing I keep coming back to. Every valid set of cuts induces a planar straight-line graph on the page:</p>
+
+  <div class="diagram-wrap">
+    <div class="pslg-row">
+
+      <!-- cuts only -->
+      <div class="diagram-item">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <rect x="10" y="10" width="140" height="140" fill="#fafaf8" stroke="#ddd" stroke-width="1"/>
+          <!-- cuts: horizontal y=80, diagonal (10,130)→(150,50) -->
+          <line x1="10" y1="80" x2="150" y2="80" stroke="#c0392b" stroke-width="1.5"/>
+          <line x1="10" y1="130" x2="150" y2="50" stroke="#1a4a7a" stroke-width="1.5"/>
+          <!-- boundary endpoint nodes -->
+          <circle cx="10" cy="80" r="4" fill="#c0392b"/>
+          <circle cx="150" cy="80" r="4" fill="#c0392b"/>
+          <circle cx="10" cy="130" r="4" fill="#1a4a7a"/>
+          <circle cx="150" cy="50" r="4" fill="#1a4a7a"/>
+          <!-- intersection at (97.5, 80): H∩D correct position -->
+          <circle cx="97.5" cy="80" r="5" fill="white" stroke="#888" stroke-width="1.5"/>
+          <text x="97.5" y="70" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#888">intersection?</text>
+        </svg>
+        <span class="label">two cuts + boundary</span>
+      </div>
+
+      <div class="arrow-step" aria-hidden="true"></div>
+
+      <!-- as graph -->
+      <div class="diagram-item">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <rect x="10" y="10" width="140" height="140" fill="#fafaf8" stroke="#ddd" stroke-width="1"/>
+          <!-- PSLG edges — split at intersection node v₃=(97.5,80) -->
+          <line x1="10" y1="80" x2="97.5" y2="80" stroke="#c0392b" stroke-width="2"/>
+          <line x1="97.5" y1="80" x2="150" y2="80" stroke="#c0392b" stroke-width="2"/>
+          <line x1="10" y1="130" x2="97.5" y2="80" stroke="#1a4a7a" stroke-width="2"/>
+          <line x1="97.5" y1="80" x2="150" y2="50" stroke="#1a4a7a" stroke-width="2"/>
+          <!-- boundary nodes -->
+          <circle cx="10" cy="80" r="5" fill="#c0392b"/>
+          <circle cx="150" cy="80" r="5" fill="#c0392b"/>
+          <circle cx="10" cy="130" r="5" fill="#1a4a7a"/>
+          <circle cx="150" cy="50" r="5" fill="#1a4a7a"/>
+          <!-- interior intersection node v₃ at (97.5,80) -->
+          <circle cx="97.5" cy="80" r="6" fill="white" stroke="#333" stroke-width="2"/>
+          <!-- node labels -->
+          <text x="97.5" y="77" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#333">v₃</text>
+          <text x="15" y="78" font-family="IBM Plex Mono,monospace" font-size="9" fill="#c0392b">v₁</text>
+          <text x="144" y="78" text-anchor="end" font-family="IBM Plex Mono,monospace" font-size="9" fill="#c0392b">v₂</text>
+          <text x="15" y="128" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1a4a7a">v₄</text>
+          <text x="144" y="48" text-anchor="end" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1a4a7a">v₅</text>
+        </svg>
+        <span class="label">PSLG — nodes are endpoints + intersections</span>
+      </div>
+
+      <div class="arrow-step" aria-hidden="true"></div>
+
+      <!-- faces of the graph = regions -->
+      <div class="diagram-item">
+        <!--
+          Diagonal: (10,130)→(150,50). Horizontal: y=80.
+          H∩D: t=50/80=0.625 → x=10+140×0.625=97.5  ∴ intersection=(97.5,80)
+          F1: (10,10)-(150,10)-(150,50)-(97.5,80)-(10,80)
+          F2: (150,50)-(150,80)-(97.5,80)
+          F3: (10,80)-(97.5,80)-(10,130)
+          F4: (97.5,80)-(150,80)-(150,150)-(10,150)-(10,130)
+        -->
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <!-- F1: large top region (above H, above diagonal) -->
+          <polygon points="10,10 150,10 150,50 97.5,80 10,80" fill="rgba(26,74,122,0.12)"/>
+          <!-- F2: small triangle top-right (above H, below diagonal) -->
+          <polygon points="150,50 150,80 97.5,80" fill="rgba(192,57,43,0.18)"/>
+          <!-- F3: triangle bottom-left (below H, above diagonal) -->
+          <polygon points="10,80 97.5,80 10,130" fill="rgba(59,109,17,0.15)"/>
+          <!-- F4: large bottom region (below H, below diagonal) -->
+          <polygon points="97.5,80 150,80 150,150 10,150 10,130" fill="rgba(136,135,128,0.15)"/>
+          <!-- border -->
+          <rect x="10" y="10" width="140" height="140" fill="none" stroke="#1a1714" stroke-width="1.5"/>
+          <!-- cuts -->
+          <line x1="10" y1="80" x2="150" y2="80" stroke="#c0392b" stroke-width="1.2"/>
+          <line x1="10" y1="130" x2="150" y2="50" stroke="#1a4a7a" stroke-width="1.2"/>
+          <!-- correct intersection node at (97.5, 80) -->
+          <circle cx="97.5" cy="80" r="4" fill="white" stroke="#888" stroke-width="1.5"/>
+          <!-- face labels at centroids -->
+          <text x="84" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1a4a7a">F₁</text>
+          <text x="133" y="70" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#c0392b">F₂</text>
+          <text x="39" y="97" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#3b6d11">F₃</text>
+          <text x="84" y="118" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#888">F₄</text>
+        </svg>
+        <span class="label">faces of the graph = cut regions</span>
+      </div>
+
+    </div>
+    <p class="diagram-caption">fig. 2 — cuts induce a PSLG; its faces (bounded regions) are the cut pieces. v₃ is the intersection node.</p>
+  </div>
+
+  <p>Every cut endpoint on the boundary is a graph node. Every intersection of two cuts is also a graph node. The cuts themselves become edges. The <em>faces</em> of the resulting planar graph — everything except the outer infinite face — are exactly the pieces you get when you scatter the cuts.</p>
+
+  <div class="callout blue">
+    <strong>Key insight so far:</strong> representing cuts as a planar straight-line graph (PSLG) lets you use existing planar subdivision algorithms to enumerate the regions. The cut points become the graph's vertices; the segments between them are its edges.
+  </div>
+
+  <!-- ═══════════════════════════ INTERESTING CASES ═══════════════════════════ -->
+
+  <h2>Some cases worth thinking about</h2>
+
+  <div class="diagram-wrap">
+    <div class="diagram-row">
+
+      <!-- star cut (3 concurrent cuts through center) -->
+      <div class="diagram-item">
+        <!--
+          Square (10,10)→(120,120). Center (65,65).
+          Cut H: (10,65)→(120,65)  |  Cut V: (65,10)→(65,120)  |  Cut D: (10,10)→(120,120)
+          All three meet at the single interior point (65,65) → degree-6 vertex.
+
+          6 wedge regions (clockwise from top):
+            R1  triangle  (65,65)-(65,10)-(10,10)          top-left, between V-up and D-up
+            R2  triangle  (65,65)-(10,10)-(10,65)          left,     between D-up and H-left
+            R3  quad      (65,65)-(10,65)-(10,120)-(65,120) bot-left, between H-left and V-down
+            R4  triangle  (65,65)-(65,120)-(120,120)       bot-right, between V-down and D-down
+            R5  triangle  (65,65)-(120,120)-(120,65)       right,    between D-down and H-right
+            R6  quad      (65,65)-(120,65)-(120,10)-(65,10) top-right, between H-right and V-up
+        -->
+        <svg width="130" height="148" viewBox="0 0 130 148">
+          <!-- colored regions -->
+          <polygon points="65,65 65,10 10,10" fill="rgba(26,74,122,0.15)"/>
+          <polygon points="65,65 10,10 10,65" fill="rgba(15,110,86,0.15)"/>
+          <polygon points="65,65 10,65 10,120 65,120" fill="rgba(59,109,17,0.15)"/>
+          <polygon points="65,65 65,120 120,120" fill="rgba(186,117,23,0.18)"/>
+          <polygon points="65,65 120,120 120,65" fill="rgba(192,57,43,0.18)"/>
+          <polygon points="65,65 120,65 120,10 65,10" fill="rgba(83,74,183,0.18)"/>
+          <!-- border -->
+          <rect x="10" y="10" width="110" height="110" fill="none" stroke="#1a1714" stroke-width="1.3"/>
+          <!-- cuts -->
+          <line x1="10" y1="65" x2="120" y2="65" stroke="#c0392b" stroke-width="1.3"/>
+          <line x1="65" y1="10" x2="65" y2="120" stroke="#1a4a7a" stroke-width="1.3"/>
+          <line x1="10" y1="10" x2="120" y2="120" stroke="#666" stroke-width="1.3" stroke-dasharray="4 3"/>
+          <!-- degree-6 node at center -->
+          <circle cx="65" cy="65" r="5" fill="white" stroke="#1a1714" stroke-width="1.5"/>
+          <!-- region labels at centroids -->
+          <text x="47" y="32" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1a4a7a">R₁</text>
+          <text x="28" y="50" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#0f6e56">R₂</text>
+          <text x="38" y="94" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#3b6d11">R₃</text>
+          <text x="84" y="104" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#ba7517">R₄</text>
+          <text x="103" y="84" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#993c1d">R₅</text>
+          <text x="93" y="38" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#534ab7">R₆</text>
+          <!-- caption inside viewBox -->
+          <text x="65" y="140" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#aaa">3 cuts, 1 common point</text>
+        </svg>
+        <span class="label">⟶ 6 regions. degree-6 vertex.</span>
+      </div>
+
+      <!-- T-junction (half-cut stops at another cut) -->
+      <div class="diagram-item">
+        <!--
+          Square (10,10)→(120,120).
+          Cut H: full horizontal (10,65)→(120,65).
+          Cut V': HALF vertical (65,10)→(65,65) — starts at top boundary, stops at H.
+
+          The half-cut creates a T-junction at (65,65).
+          It does NOT continue below y=65, so the bottom half is undivided.
+
+          Result: 3 regions (NOT 2):
+            R1  (10,10)-(65,10)-(65,65)-(10,65)    top-left
+            R2  (65,10)-(120,10)-(120,65)-(65,65)  top-right
+            R3  (10,65)-(120,65)-(120,120)-(10,120) full bottom (undivided)
+        -->
+        <svg width="130" height="148" viewBox="0 0 130 148">
+          <!-- colored regions -->
+          <polygon points="10,10 65,10 65,65 10,65" fill="rgba(26,74,122,0.15)"/>
+          <polygon points="65,10 120,10 120,65 65,65" fill="rgba(15,110,86,0.15)"/>
+          <polygon points="10,65 120,65 120,120 10,120" fill="rgba(186,117,23,0.15)"/>
+          <!-- border -->
+          <rect x="10" y="10" width="110" height="110" fill="none" stroke="#1a1714" stroke-width="1.3"/>
+          <!-- full horizontal cut -->
+          <line x1="10" y1="65" x2="120" y2="65" stroke="#c0392b" stroke-width="1.3"/>
+          <!-- half vertical cut — from top edge to horizontal only -->
+          <line x1="65" y1="10" x2="65" y2="65" stroke="#1a4a7a" stroke-width="1.3"/>
+          <!-- T-junction node (endpoint of half-cut, on the horizontal cut) -->
+          <circle cx="65" cy="65" r="4" fill="white" stroke="#1a1714" stroke-width="1.5"/>
+          <!-- region labels -->
+          <text x="37" y="40" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1a4a7a">R₁</text>
+          <text x="93" y="40" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#0f6e56">R₂</text>
+          <text x="65" y="97" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#ba7517">R₃</text>
+          <!-- caption inside viewBox -->
+          <text x="65" y="140" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#aaa">T-junction cut</text>
+        </svg>
+        <span class="label">⟶ 3 regions. only top half splits.</span>
+      </div>
+
+      <!-- parallel cuts -->
+      <div class="diagram-item">
+        <!--
+          Square (10,10)→(120,120).
+          Cut H1: (10,45)→(120,45)  |  Cut H2: (10,85)→(120,85)
+          Parallel lines never intersect → no interior nodes.
+          3 regions: top strip, middle strip, bottom strip.
+        -->
+        <svg width="130" height="148" viewBox="0 0 130 148">
+          <!-- colored regions -->
+          <polygon points="10,10 120,10 120,45 10,45" fill="rgba(26,74,122,0.15)"/>
+          <polygon points="10,45 120,45 120,85 10,85" fill="rgba(15,110,86,0.15)"/>
+          <polygon points="10,85 120,85 120,120 10,120" fill="rgba(186,117,23,0.15)"/>
+          <!-- border -->
+          <rect x="10" y="10" width="110" height="110" fill="none" stroke="#1a1714" stroke-width="1.3"/>
+          <!-- cuts -->
+          <line x1="10" y1="45" x2="120" y2="45" stroke="#c0392b" stroke-width="1.3"/>
+          <line x1="10" y1="85" x2="120" y2="85" stroke="#c0392b" stroke-width="1.3"/>
+          <!-- boundary nodes (no interior intersections exist) -->
+          <circle cx="10" cy="45" r="3" fill="#c0392b"/>
+          <circle cx="120" cy="45" r="3" fill="#c0392b"/>
+          <circle cx="10" cy="85" r="3" fill="#c0392b"/>
+          <circle cx="120" cy="85" r="3" fill="#c0392b"/>
+          <!-- region labels -->
+          <text x="65" y="30" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#1a4a7a">R₁</text>
+          <text x="65" y="68" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#0f6e56">R₂</text>
+          <text x="65" y="106" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#ba7517">R₃</text>
+          <!-- caption inside viewBox -->
+          <text x="65" y="140" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="9" fill="#aaa">2 parallel cuts</text>
+        </svg>
+        <span class="label">⟶ 3 regions. no intersection node.</span>
+      </div>
+
+    </div>
+    <p class="diagram-caption">fig. 3 — edge cases worth handling: high-degree vertices, T-junctions, parallel cuts.</p>
+  </div>
+
+  <p>The T-junction case is particularly sneaky. The half-cut goes from the boundary to another cut — it doesn't exit through the other side. This <em>does</em> still divide regions: the top half gets split into two, but the bottom half is untouched, giving 3 regions total (not 2). Now the question for your algorithm is whether a T-junction endpoint is treated differently from a full intersection node — in PSLG terms, v has degree 3 instead of 4, which changes the face-walking logic.</p>
+
+  <!-- ═══════════════════════════ LEARNINGS ═══════════════════════════ -->
+
+  <h2>What I've figured out so far</h2>
+
+  <div class="learning-section">
+    <h4>Running notes — updated as I go</h4>
+    <p>Cut endpoints on the boundary of the page can be treated as nodes in a graph. So can any interior intersection of two cuts. Everything between two consecutive nodes on the same cut becomes a graph edge.</p>
+    <p>The faces of this planar graph (the PSLG) correspond directly to the cut pieces. So enumerating pieces = traversing faces = the classic face-finding problem on a planar graph.</p>
+    <p>A DCEL (Doubly Connected Edge List) is a natural data structure for this — each edge has a twin, prev, and next pointer. Faces can be walked in O(edges) time. But building a DCEL correctly from raw line segments involves a sweep-line step to find all intersections first.</p>
+    <p>The number of regions after <em>n</em> full cuts on a bounded rectangle follows a recurrence, but it's not just "add one per cut" — depends on how many existing cuts each new cut crosses.</p>
+  </div>
+
+  <div class="learning-pills">
+    <span class="learning"><span class="learning-dot"></span>PSLG as the underlying structure</span>
+    <span class="learning"><span class="learning-dot"></span>Intersections → interior nodes</span>
+    <span class="learning"><span class="learning-dot"></span>Faces = regions</span>
+    <span class="learning"><span class="learning-dot"></span>DCEL for adjacency</span>
+    <span class="learning"><span class="learning-dot"></span>Sweep line for intersections</span>
+  </div>
+
+  <!-- ═══════════════════════════ EXTENSION ═══════════════════════════ -->
+
+  <h2>The harder variant: re-assembly</h2>
+
+  <p>Once you can go from cuts → regions, you can flip it. Given an unlabeled set of polygonal pieces (no coordinates, just shapes), can you determine if they came from a single rectangular page? And if so, how many cuts were made, and where?</p>
+
+  <p>This is the shredder problem — and it's substantially harder. You'd need to:</p>
+
+  <ol class="numbered-list">
+    <li>Define a canonical representation for each piece that's invariant to translation (and maybe rotation).</li>
+    <li>Find edge matchings — two pieces are adjacent if they share an edge of equal length.</li>
+    <li>Verify that the assembled configuration tiles into a valid rectangle.</li>
+    <li>Decide whether reflected/rotated pieces count as "the same."</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Open question:</strong> is there always a unique reconstruction? Or can two different cut sets produce identical multisets of pieces? What's the smallest example where reconstruction is ambiguous?
+  </div>
+
+  <!-- ═══════════════════════════ CTA ═══════════════════════════ -->
+
+  <div class="tags-block">
+    <div class="tags-label">tags</div>
+    <span class="tag">#DSA</span>
+    <span class="tag">#ComputationalGeometry</span>
+    <span class="tag">#PSLG</span>
+    <span class="tag">#DCEL</span>
+    <span class="tag">#PlanarGraphs</span>
+    <span class="tag">#TryItYourself</span>
+    <span class="tag">#ThinkingOutLoud</span>
+  </div>
+
+  <div class="cta">
+    <div class="cta-icon" aria-hidden="true">✂</div>
+    <div class="cta-text">
+      <p>I'm still thinking about this. No solution here — <strong>that's the point.</strong> If you have thoughts on the representation questions, a counterexample, or just want to argue about whether T-junction cuts should be allowed — I'm all ears. Will post updates as I figure things out.</p>
+      <p class="cta-sub">Replies, quote-posts, DMs all welcome — <a href="https://twitter.com/omkar_builds" rel="author noopener" target="_blank">@omkar_builds</a>. Let's think about this together.</p>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <span>© 2026 · Paper Cuts · thinking out loud</span>
+    <a class="twitter-cta" href="https://twitter.com/omkar_builds" rel="author noopener" target="_blank" aria-label="Follow @omkar_builds on Twitter">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      <span>@omkar_builds</span>
+    </a>
+  </footer>
+
+</article>
+
+<script>
+  // scroll progress indicator
+  (function () {
+    var bar = document.getElementById('progressBar');
+    if (!bar) return;
+    var ticking = false;
+    function update() {
+      var doc = document.documentElement;
+      var scrollTop = doc.scrollTop || document.body.scrollTop;
+      var max = (doc.scrollHeight - doc.clientHeight) || 1;
+      var pct = Math.min(100, Math.max(0, (scrollTop / max) * 100));
+      bar.style.width = pct + '%';
+      ticking = false;
+    }
+    function onScroll() {
+      if (!ticking) {
+        window.requestAnimationFrame(update);
+        ticking = true;
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+  })();
+</script>
+</body>
+</html>
