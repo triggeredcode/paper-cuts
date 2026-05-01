@@ -99,36 +99,69 @@ footer a:hover{border-color:var(--ac);}
 <h2>1 — MurmurHash3 (32-bit, seeded)</h2>
 <p>The article uses MurmurHash3 throughout. It's the most common bloom-filter hash: very fast (~0.3 ns/byte on modern x86), excellent uniform distribution, simple enough to fit in a screen. This is the canonical 32-bit variant — port it once and reuse for every filter type below.</p>
 <div class="dt-meta">// hash · ~30 lines · zero deps</div>
-<pre><code><span class="cm">// MurmurHash3 — 32-bit, seeded.
-// Uniform distribution, fast avalanche. Returns unsigned 32-bit int.</span>
+<pre><code><span class="cm">// MurmurHash3 — 32-bit, seeded variant by Austin Appleby.
+//
+// Why this hash for bloom filters?
+//   1. Speed: ~0.3 ns/byte — orders of magnitude faster than SHA-256
+//      and we don't need crypto guarantees, just uniform distribution.
+//   2. Avalanche: a one-bit input change flips ~50% of output bits,
+//      which is exactly what bloom filters need (see avalanche demo).
+//   3. Tiny: fits in 20 lines of JS, easy to audit and port.
+//
+// The magic constants (0xcc9e2d51, 0x1b873593, 0xe6546b64) were
+// chosen empirically by Appleby to maximize avalanche over millions
+// of test inputs. They are not arbitrary — changing any of them
+// degrades distribution measurably.</span>
 <span class="kw">function</span> murmur3(str, seed = <span class="nm">0</span>) {
-  <span class="kw">let</span> h = seed >>> <span class="nm">0</span>;
+  <span class="kw">let</span> h = seed >>> <span class="nm">0</span>;             <span class="cm">// >>> 0 forces unsigned 32-bit</span>
   <span class="kw">const</span> c1 = <span class="nm">0xcc9e2d51</span>, c2 = <span class="nm">0x1b873593</span>;
+
+  <span class="cm">// Body: process one input char at a time. Real Murmur3 processes
+  // 4 bytes at a time, but for JS strings (UTF-16 code units) the
+  // per-char approach is simpler and still uniformly distributed.</span>
   <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; str.length; i++) {
     <span class="kw">let</span> k = str.charCodeAt(i);
-    k = Math.imul(k, c1);
-    k = (k &lt;&lt; <span class="nm">15</span>) | (k >>> <span class="nm">17</span>);   <span class="cm">// rotl 15</span>
+    k = Math.imul(k, c1);                <span class="cm">// Math.imul: 32-bit safe multiply</span>
+    k = (k &lt;&lt; <span class="nm">15</span>) | (k >>> <span class="nm">17</span>);          <span class="cm">// rotate left 15 → spread high bits</span>
     k = Math.imul(k, c2);
-    h ^= k;
-    h = (h &lt;&lt; <span class="nm">13</span>) | (h >>> <span class="nm">19</span>);   <span class="cm">// rotl 13</span>
+    h ^= k;                              <span class="cm">// XOR-mix into the running state</span>
+    h = (h &lt;&lt; <span class="nm">13</span>) | (h >>> <span class="nm">19</span>);          <span class="cm">// rotate left 13 → diffuse</span>
     h = (Math.imul(h, <span class="nm">5</span>) + <span class="nm">0xe6546b64</span>) >>> <span class="nm">0</span>;
   }
-  h ^= str.length;
-  <span class="cm">// Finalization mix — drives avalanche</span>
+
+  h ^= str.length;                       <span class="cm">// Length-mix: prevents trivial prefix collisions</span>
+
+  <span class="cm">// Finalization mix ("fmix32"). Three xorshift+multiply rounds
+  // that turn any remaining structure in h into white noise. This
+  // is the step that makes flipping one input bit flip ~half the
+  // output bits — the avalanche property.</span>
   h ^= h >>> <span class="nm">16</span>; h = Math.imul(h, <span class="nm">0x85ebca6b</span>) >>> <span class="nm">0</span>;
   h ^= h >>> <span class="nm">13</span>; h = Math.imul(h, <span class="nm">0xc2b2ae35</span>) >>> <span class="nm">0</span>;
   h ^= h >>> <span class="nm">16</span>;
-  <span class="kw">return</span> h >>> <span class="nm">0</span>;
+  <span class="kw">return</span> h >>> <span class="nm">0</span>;                      <span class="cm">// Final unsigned coercion</span>
 }
 
-<span class="cm">// Kirsch-Mitzenmacher — derive k positions from 2 hashes
-// gᵢ(x) = h₁(x) + i · h₂(x)  mod m</span>
+
+<span class="cm">// Kirsch-Mitzenmacher (2006) — derive k bloom-filter positions
+// from just 2 base hashes:
+//
+//     gᵢ(x) = h₁(x) + i · h₂(x)   mod m       for i = 0 … k-1
+//
+// The proof: as long as h₁ and h₂ are pairwise independent, the
+// gᵢ are "good enough" for asymptotic FPR — adding negligible
+// error vs. computing k separate hashes. Hashing cost drops from
+// O(k) to O(2) per insert/lookup. This is THE optimization every
+// production bloom filter uses today.</span>
 <span class="kw">function</span> getPositions(item, k, m) {
   <span class="kw">const</span> s = String(item);
   <span class="kw">const</span> h1 = murmur3(s, <span class="nm">0x9747b28c</span>);
-  <span class="kw">const</span> h2 = murmur3(s, <span class="nm">0xe17a1465</span>) | <span class="nm">1</span>;  <span class="cm">// odd → coprime to m</span>
+  <span class="cm">// `| 1` forces h₂ to be odd. m is usually even, so an odd
+  // step ensures gcd(h₂, m) = 1 → the sequence h₁, h₁+h₂,
+  // h₁+2h₂, … visits every position before repeating, avoiding
+  // pathological clustering when m and h₂ share a factor.</span>
+  <span class="kw">const</span> h2 = murmur3(s, <span class="nm">0xe17a1465</span>) | <span class="nm">1</span>;
   <span class="kw">return</span> Array.from({length: k},
-    (_, i) => ((h1 + i * h2) % m + m) % m);
+    (_, i) => ((h1 + i * h2) % m + m) % m); <span class="cm">// double mod: % can return negative for negative operands</span>
 }</code></pre>
 </section>
 
@@ -137,20 +170,32 @@ footer a:hover{border-color:var(--ac);}
 <p>The reference implementation. Constructor takes expected item count <code>n</code> and target false positive rate <code>p</code>; computes optimal <code>m</code> and <code>k*</code>, allocates a <code>Uint8Array</code>. Mergeable, serializable, ~70 lines.</p>
 <div class="dt-meta">// standard · 70 lines · production-ready</div>
 <pre><code><span class="kw">class</span> BloomFilter {
+  <span class="cm">// Construct a filter sized for n expected items at FPR p.
+  // We pick m and k from the closed-form optima derived in §6:
+  //
+  //     m* = -n · ln(p) / (ln 2)²       ← optimal bit count
+  //     k* = (m / n) · ln 2              ← optimal hash count
+  //
+  // m* is the *minimum* number of bits that achieves p when k is
+  // also chosen optimally. Round up — under-sizing gives worse FPR.</span>
   <span class="kw">constructor</span>(n, p = <span class="nm">0.01</span>) {
     <span class="kw">if</span> (p &lt;= <span class="nm">0</span> || p &gt;= <span class="nm">1</span>) <span class="kw">throw new</span> Error(<span class="st">'p must be in (0, 1)'</span>);
     <span class="kw">if</span> (!Number.isInteger(n) || n &lt; <span class="nm">1</span>) <span class="kw">throw new</span> Error(<span class="st">'n must be a positive integer'</span>);
-    <span class="kw">const</span> ln2 = Math.LN2;
-    <span class="kw">this</span>.m = Math.ceil(-n * Math.log(p) / (ln2 * ln2));
-    <span class="kw">this</span>.k = Math.max(<span class="nm">1</span>, Math.round((<span class="kw">this</span>.m / n) * ln2));
+    <span class="kw">const</span> ln2 = Math.LN2;                                    <span class="cm">// ≈ 0.6931</span>
+    <span class="kw">this</span>.m = Math.ceil(-n * Math.log(p) / (ln2 * ln2));        <span class="cm">// ≈ 9.585·n at p=1%</span>
+    <span class="kw">this</span>.k = Math.max(<span class="nm">1</span>, Math.round((<span class="kw">this</span>.m / n) * ln2));      <span class="cm">// ≈ 7 at p=1%</span>
     <span class="kw">this</span>.n = n; <span class="kw">this</span>.p = p; <span class="kw">this</span>.count = <span class="nm">0</span>;
+    <span class="cm">// Uint8Array packs 8 bits per byte. ceil(m/8) bytes covers m bits.</span>
     <span class="kw">this</span>.data = <span class="kw">new</span> Uint8Array(Math.ceil(<span class="kw">this</span>.m / <span class="nm">8</span>));
   }
 
+  <span class="cm">// Compute the k bit positions for an item using Kirsch-Mitzenmacher.
+  // Identical to the standalone getPositions() above, inlined here so
+  // the class is self-contained and one copy of murmur3 is reused.</span>
   _positions(item) {
     <span class="kw">const</span> s = String(item);
     <span class="kw">const</span> h1 = murmur3(s, <span class="nm">0x9747b28c</span>);
-    <span class="kw">const</span> h2 = murmur3(s, <span class="nm">0xe17a1465</span>) | <span class="nm">1</span>;
+    <span class="kw">const</span> h2 = murmur3(s, <span class="nm">0xe17a1465</span>) | <span class="nm">1</span>;            <span class="cm">// odd → coprime to m</span>
     <span class="kw">const</span> r = <span class="kw">new</span> Array(<span class="kw">this</span>.k);
     <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.k; i++) {
       r[i] = ((h1 + i * h2) % <span class="kw">this</span>.m + <span class="kw">this</span>.m) % <span class="kw">this</span>.m;
@@ -158,9 +203,18 @@ footer a:hover{border-color:var(--ac);}
     <span class="kw">return</span> r;
   }
 
+  <span class="cm">// Bit-level set/test on a packed byte array. The math:
+  //   byte index  = i ÷ 8  (i &gt;&gt; 3 — fast integer division)
+  //   bit offset  = i mod 8 (i &amp; 7 — fast mod for power-of-2)
+  //   bit mask    = 1 &lt;&lt; offset
+  // Saves 8× memory vs. a boolean array; ~3× faster than indexing
+  // into Array&lt;bool&gt; thanks to typed-array memory layout.</span>
   _set(i)  { <span class="kw">this</span>.data[i >>> <span class="nm">3</span>] |=  (<span class="nm">1</span> &lt;&lt; (i &amp; <span class="nm">7</span>)); }
   _test(i) { <span class="kw">return</span> (<span class="kw">this</span>.data[i >>> <span class="nm">3</span>] &amp;  (<span class="nm">1</span> &lt;&lt; (i &amp; <span class="nm">7</span>))) !== <span class="nm">0</span>; }
 
+  <span class="cm">// Insert: set all k bits. Idempotent — adding the same item twice
+  // is a no-op for membership but bumps `count` (a saturating
+  // approximation; for exact size, use a Set alongside).</span>
   add(item) {
     <span class="kw">const</span> ps = <span class="kw">this</span>._positions(item);
     <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> ps) <span class="kw">this</span>._set(p);
@@ -168,23 +222,39 @@ footer a:hover{border-color:var(--ac);}
     <span class="kw">return this</span>;
   }
 
+  <span class="cm">// Membership test — short-circuits on the first 0 bit.
+  // Returns:  false → definitely NOT in set (zero false negatives)
+  //           true  → probably in set, FPR = (1 - e^(-kn/m))^k</span>
   has(item) {
     <span class="kw">const</span> ps = <span class="kw">this</span>._positions(item);
     <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> ps) <span class="kw">if</span> (!<span class="kw">this</span>._test(p)) <span class="kw">return false</span>;
     <span class="kw">return true</span>;
   }
 
+  <span class="cm">// Empirical fill rate — used to detect when a filter is over-saturated.
+  // Theory: at the optimal k*, fill rate stabilizes at exactly 50%.
+  // If you see &gt; 70%, your n was too small or your p too aggressive.</span>
   fillRate() {
     <span class="kw">let</span> n = <span class="nm">0</span>;
     <span class="kw">for</span> (<span class="kw">const</span> b <span class="kw">of</span> <span class="kw">this</span>.data) {
-      <span class="cm">// Brian Kernighan bit count</span>
+      <span class="cm">// Brian Kernighan's popcount: x &amp;= x-1 clears the lowest set
+      // bit; loop runs once per set bit, not 8 times. Way faster
+      // than checking each bit individually for sparse bytes.</span>
       <span class="kw">let</span> x = b;
       <span class="kw">while</span> (x) { n++; x &amp;= x - <span class="nm">1</span>; }
     }
     <span class="kw">return</span> n / <span class="kw">this</span>.m;
   }
 
-  <span class="cm">// Bitwise OR — union of two sets</span>
+  <span class="cm">// Set union via byte-wise OR. Works because:
+  //   bit_i(A ∪ B) = bit_i(A) OR bit_i(B)
+  // for every position. Both filters MUST have the same (m, k) and
+  // use identical hashes — otherwise the bit positions don't align
+  // across filters and the result is meaningless.
+  //
+  // Common use: shard inserts across N machines, OR-merge their
+  // filters into one summary at query time. Bandwidth is O(m/8) bytes
+  // regardless of how many items each shard saw.</span>
   merge(other) {
     <span class="kw">if</span> (<span class="kw">this</span>.m !== other.m || <span class="kw">this</span>.k !== other.k) {
       <span class="kw">throw new</span> Error(<span class="st">'Incompatible filters: same m and k required'</span>);
@@ -195,6 +265,9 @@ footer a:hover{border-color:var(--ac);}
     <span class="kw">return this</span>;
   }
 
+  <span class="cm">// Wire format: just the raw bits, base64'd. The receiver needs to
+  // know n and p separately (transmit alongside, or pre-agree on
+  // shape). For richer formats, encode m+k+data into a binary header.</span>
   toBase64() {
     <span class="kw">return</span> btoa(String.fromCharCode(...<span class="kw">this</span>.data));
   }
@@ -220,40 +293,66 @@ footer a:hover{border-color:var(--ac);}
 <div class="callout w">Never use <code>has()</code> to gate a deletion. False positives mean <code>has()</code> returning true is no proof of membership. Always maintain a separate ground-truth record (a Set, a database column) for confirmed members and only delete from that.</div>
 <div class="dt-meta">// counting · ~75 lines · 4× memory cost</div>
 <pre><code><span class="kw">class</span> CountingBloomFilter {
+  <span class="cm">// Same m/k formulas as the standard filter — but each "bit" is now
+  // a 4-bit counter, so the storage cost is 4× larger. Trade memory
+  // for the ability to delete (the standard filter cannot delete:
+  // clearing a bit might also clear it for some other item).</span>
   <span class="kw">constructor</span>(n, p = <span class="nm">0.01</span>) {
     <span class="kw">const</span> ln2 = Math.LN2;
     <span class="kw">this</span>.m = Math.ceil(-n * Math.log(p) / (ln2 * ln2));
     <span class="kw">this</span>.k = Math.max(<span class="nm">1</span>, Math.round((<span class="kw">this</span>.m / n) * ln2));
     <span class="kw">this</span>.n = n; <span class="kw">this</span>.p = p;
-    <span class="cm">// 4-bit counters packed two per byte</span>
+    <span class="cm">// Pack 2 counters per byte (4 bits each → 16 levels: 0…15).
+    // ceil(m/2) bytes. So 4× memory vs. a standard bloom filter.</span>
     <span class="kw">this</span>.data = <span class="kw">new</span> Uint8Array(Math.ceil(<span class="kw">this</span>.m / <span class="nm">2</span>));
   }
 
   _positions(item)      { <span class="kw">return</span> getPositions(item, <span class="kw">this</span>.k, <span class="kw">this</span>.m); }
-  _get(i)               { <span class="kw">return</span> (<span class="kw">this</span>.data[i >> <span class="nm">1</span>] >>> ((i &amp; <span class="nm">1</span>) * <span class="nm">4</span>)) &amp; <span class="nm">0xF</span>; }
+
+  <span class="cm">// Read the i-th 4-bit counter. Even i → low nibble, odd → high.
+  //   byte index = i &gt;&gt; 1 (i ÷ 2)
+  //   shift      = (i &amp; 1) * 4 (0 for even, 4 for odd)
+  //   mask       = 0xF (lowest 4 bits of the shifted byte)</span>
+  _get(i) { <span class="kw">return</span> (<span class="kw">this</span>.data[i >> <span class="nm">1</span>] >>> ((i &amp; <span class="nm">1</span>) * <span class="nm">4</span>)) &amp; <span class="nm">0xF</span>; }
+
+  <span class="cm">// Write the i-th counter. Three steps: clear the target nibble,
+  // mask v to 4 bits, OR it back in. Don't disturb the other nibble.</span>
   _set(i, v) {
     <span class="kw">const</span> b = i >> <span class="nm">1</span>, s = (i &amp; <span class="nm">1</span>) * <span class="nm">4</span>;
     <span class="kw">this</span>.data[b] = (<span class="kw">this</span>.data[b] &amp; ~(<span class="nm">0xF</span> &lt;&lt; s)) | ((v &amp; <span class="nm">0xF</span>) &lt;&lt; s);
   }
 
+  <span class="cm">// Increment k counters on insert.
+  // Counter saturates at 15 — once there, it can never decrement.
+  // This sounds bad but is actually crucial for correctness: if we
+  // wrapped around (15 → 0), a later remove() could falsely zero a
+  // counter that's still genuinely held by other items. Sticky
+  // saturation just means the filter can't shrink as much, but
+  // false negatives are still impossible.</span>
   add(item) {
     <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> <span class="kw">this</span>._positions(item)) {
       <span class="kw">const</span> v = <span class="kw">this</span>._get(p);
       <span class="kw">if</span> (v &lt; <span class="nm">15</span>) <span class="kw">this</span>._set(p, v + <span class="nm">1</span>);
-      <span class="cm">// 15 is sticky — saturating to prevent false negatives on later decrements</span>
     }
   }
 
-  <span class="cm">// IMPORTANT: only call when you have already verified
-  // (via a separate ground-truth set) that `item` was actually added.</span>
+  <span class="cm">// CRITICAL: only call after independently verifying the item was
+  // really added. has() returning true is NOT proof — that's a
+  // probabilistic statement. If you decrement based on a false
+  // positive, you corrupt other items' counters. Always pair this
+  // with an authoritative source (DB row, Set, etc.).</span>
   remove(item) {
     <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> <span class="kw">this</span>._positions(item)) {
       <span class="kw">const</span> v = <span class="kw">this</span>._get(p);
+      <span class="cm">// Two guards: don't underflow (0 → 15 wraparound) and don't
+      // touch saturated counters (we don't know their true value).</span>
       <span class="kw">if</span> (v &gt; <span class="nm">0</span> &amp;&amp; v &lt; <span class="nm">15</span>) <span class="kw">this</span>._set(p, v - <span class="nm">1</span>);
-      <span class="cm">// Don't decrement saturated counters — we lost their true value</span>
     }
   }
 
+  <span class="cm">// "Definitely absent" iff any counter is zero. Identical
+  // membership semantics to a standard filter — same FPR formula,
+  // zero false negatives.</span>
   has(item) {
     <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> <span class="kw">this</span>._positions(item)) {
       <span class="kw">if</span> (<span class="kw">this</span>._get(p) === <span class="nm">0</span>) <span class="kw">return false</span>;
@@ -269,14 +368,25 @@ footer a:hover{border-color:var(--ac);}
 <p>Total FPR is bounded by the geometric series <code>p₀/(1−r)</code> where <code>r &lt; 1</code> is the per-filter tightening ratio. With <code>r=0.9</code> and <code>p₀=0.001</code>, total FPR stays under <code>0.01</code>.</p>
 <div class="dt-meta">// scalable · ~50 lines · works without a known n</div>
 <pre><code><span class="kw">class</span> ScalableBloomFilter {
+  <span class="cm">// Almeida et al. (2007). Solve the "n is unknown" problem by
+  // chaining filters: when one fills up, freeze it and start a
+  // bigger, tighter one. Membership = OR across all filters.
+  //
+  // Key insight: total FPR is bounded by a geometric series.
+  //   p_total ≤ p₀ · (1 - r)⁻¹      with r &lt; 1
+  // E.g. p₀ = 0.001, r = 0.9 → p_total ≤ 0.01.
+  // The first filter is sized for `initialN` and FPR `p₀ = p·(1-r)`,
+  // so even after infinite chaining, total FPR stays at p.</span>
   <span class="kw">constructor</span>(initialN = <span class="nm">1000</span>, p = <span class="nm">0.01</span>, growthFactor = <span class="nm">2</span>, tightening = <span class="nm">0.9</span>) {
-    <span class="kw">this</span>.r = tightening;            <span class="cm">// tightening ratio per filter</span>
-    <span class="kw">this</span>.growth = growthFactor;     <span class="cm">// each new filter is ×growth bigger</span>
-    <span class="kw">this</span>.threshold = <span class="nm">0.5</span>;            <span class="cm">// rotate when fill exceeds this</span>
-    <span class="cm">// Sub-filter targets a tighter FPR so the bound holds</span>
+    <span class="kw">this</span>.r = tightening;            <span class="cm">// each new filter targets r× the previous FPR</span>
+    <span class="kw">this</span>.growth = growthFactor;     <span class="cm">// each new filter has ×growth more capacity</span>
+    <span class="kw">this</span>.threshold = <span class="nm">0.5</span>;            <span class="cm">// rotate when fill exceeds this — matches optimal-k fill</span>
+    <span class="cm">// First sub-filter sized for the geometric-series bound to hold.</span>
     <span class="kw">this</span>.filters = [<span class="kw">new</span> BloomFilter(initialN, p * (<span class="nm">1</span> - tightening))];
   }
 
+  <span class="cm">// Insert into the most recent (active) filter. If it's saturated,
+  // freeze it and append a new one. Older filters are read-only.</span>
   add(item) {
     <span class="kw">let</span> cur = <span class="kw">this</span>.filters[<span class="kw">this</span>.filters.length - <span class="nm">1</span>];
     <span class="kw">if</span> (cur.fillRate() &gt; <span class="kw">this</span>.threshold) {
@@ -286,6 +396,9 @@ footer a:hover{border-color:var(--ac);}
     cur.add(item);
   }
 
+  <span class="cm">// Lookup must check ALL sub-filters — item may have been added
+  // to any of them. O(number-of-sub-filters) work per query, but
+  // that count grows logarithmically with total size.</span>
   has(item) {
     <span class="kw">for</span> (<span class="kw">const</span> f <span class="kw">of</span> <span class="kw">this</span>.filters) <span class="kw">if</span> (f.has(item)) <span class="kw">return true</span>;
     <span class="kw">return false</span>;
@@ -302,16 +415,29 @@ footer a:hover{border-color:var(--ac);}
 <p>Divides <em>m</em> bits into <em>k</em> equal partitions; hash function <em>i</em> can only set a bit in partition <em>i</em>. Guarantees that exactly <em>k</em> bits are set per item (a standard filter sets fewer when two hashes collide). FPR is essentially identical to a standard filter for large <em>m</em>; the practical advantage is cache-line alignment per partition.</p>
 <div class="dt-meta">// partitioned · ~40 lines</div>
 <pre><code><span class="kw">class</span> PartitionedBloomFilter {
+  <span class="cm">// Same total size m as a standard filter, but split into k equal
+  // strips. Hash function i can ONLY set a bit in strip i.
+  //
+  // Why partition?
+  //   1. Predictability: every insert touches exactly k bits (a
+  //      standard filter sets fewer when two hashes collide on the
+  //      same bit, which complicates fill-rate accounting).
+  //   2. Cache locality: if a partition fits in one cache line
+  //      (≤ 512 bits = 64 B), all bits for one item land in 1-k
+  //      cache lines, predictably.
+  //   3. Easier to parallelise: each strip is independent.</span>
   <span class="kw">constructor</span>(n, p = <span class="nm">0.01</span>) {
     <span class="kw">const</span> ln2 = Math.LN2;
     <span class="kw">const</span> mTotal = Math.ceil(-n * Math.log(p) / (ln2 * ln2));
     <span class="kw">this</span>.k = Math.max(<span class="nm">1</span>, Math.round((mTotal / n) * ln2));
-    <span class="kw">this</span>.partitionSize = Math.ceil(mTotal / <span class="kw">this</span>.k);
-    <span class="kw">this</span>.m = <span class="kw">this</span>.partitionSize * <span class="kw">this</span>.k;
+    <span class="kw">this</span>.partitionSize = Math.ceil(mTotal / <span class="kw">this</span>.k);  <span class="cm">// bits per partition</span>
+    <span class="kw">this</span>.m = <span class="kw">this</span>.partitionSize * <span class="kw">this</span>.k;            <span class="cm">// rounded total ≥ mTotal</span>
     <span class="kw">this</span>.partitions = Array.from({length: <span class="kw">this</span>.k},
       () => <span class="kw">new</span> Uint8Array(Math.ceil(<span class="kw">this</span>.partitionSize / <span class="nm">8</span>)));
   }
 
+  <span class="cm">// Returns k positions, each modulo partitionSize (NOT m).
+  // Same Kirsch-Mitzenmacher trick as before.</span>
   _hashes(item) {
     <span class="kw">const</span> s = String(item);
     <span class="kw">const</span> h1 = murmur3(s, <span class="nm">0x9747b28c</span>);
@@ -323,6 +449,8 @@ footer a:hover{border-color:var(--ac);}
   add(item) {
     <span class="kw">const</span> hs = <span class="kw">this</span>._hashes(item);
     <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.k; i++) {
+      <span class="cm">// Set bit hs[i] in partition i — bit-twiddle is identical
+      // to the standard filter's _set, just scoped to one strip.</span>
       <span class="kw">this</span>.partitions[i][hs[i] >>> <span class="nm">3</span>] |= (<span class="nm">1</span> &lt;&lt; (hs[i] &amp; <span class="nm">7</span>));
     }
   }
@@ -343,36 +471,58 @@ footer a:hover{border-color:var(--ac);}
 <p>~3× more space-efficient than a counting filter at the same FPR, but worst-case insert can fail (rare with proper sizing — handle by rebuilding into a larger filter or expanding bucket size).</p>
 <div class="dt-meta">// cuckoo · ~110 lines · deletion + space-efficient</div>
 <pre><code><span class="kw">class</span> CuckooFilter {
+  <span class="cm">// Fan, Andersen, Kaminsky, Mitzenmacher (2014). A radically
+  // different design that beats bloom filters on space at the
+  // same FPR while supporting O(1) deletes natively.
+  //
+  // Storage:  numBuckets × bucketSize × fpBits  bits.
+  //   - 95% load factor possible (vs. 50% for optimal bloom).
+  //   - Each item = one fpBits-bit fingerprint (default 8) — much
+  //     smaller than storing the key, but enough to discriminate
+  //     between items hashing to the same bucket.</span>
   <span class="kw">constructor</span>(capacity = <span class="nm">10000</span>, fpBits = <span class="nm">8</span>, bucketSize = <span class="nm">4</span>, maxKicks = <span class="nm">500</span>) {
     <span class="kw">this</span>.bucketSize = bucketSize;
     <span class="kw">this</span>.fpBits = fpBits;
     <span class="kw">this</span>.maxKicks = maxKicks;
-    <span class="cm">// Round numBuckets up to a power of 2 for clean modulo via &amp;</span>
+    <span class="cm">// We aim for ≤ 95% load. Round up to a power of 2 so we can
+    // mask instead of mod (much faster on hot paths).</span>
     <span class="kw">const</span> needed = Math.ceil(capacity / bucketSize / <span class="nm">0.95</span>);
     <span class="kw">this</span>.numBuckets = <span class="nm">1</span>;
     <span class="kw">while</span> (<span class="kw">this</span>.numBuckets &lt; needed) <span class="kw">this</span>.numBuckets *= <span class="nm">2</span>;
-    <span class="kw">this</span>.mask = <span class="kw">this</span>.numBuckets - <span class="nm">1</span>;
+    <span class="kw">this</span>.mask = <span class="kw">this</span>.numBuckets - <span class="nm">1</span>;       <span class="cm">// (b &amp; mask) == (b mod numBuckets)</span>
     <span class="kw">this</span>.fpMask = (<span class="nm">1</span> &lt;&lt; fpBits) - <span class="nm">1</span>;
-    <span class="cm">// Each bucket is bucketSize fingerprints (0 = empty slot)</span>
+    <span class="cm">// Each bucket holds bucketSize fingerprints. 0 represents
+    // "empty" — so fingerprints must be non-zero.</span>
     <span class="kw">this</span>.buckets = Array.from({length: <span class="kw">this</span>.numBuckets},
       () => <span class="kw">new</span> Array(bucketSize).fill(<span class="nm">0</span>));
   }
 
+  <span class="cm">// Compute an fpBits-bit fingerprint of the item.
+  // We add 1 to ensure fp is in [1, fpMask], reserving 0 for empty.
+  // If the raw hash modulo fpMask is already 0, that's fine — the
+  // +1 shifts every value by one without affecting uniqueness.</span>
   _fp(item) {
-    <span class="cm">// Reserve fp = 0 for empty slots</span>
     <span class="kw">const</span> h = murmur3(String(item), <span class="nm">0xface</span>);
     <span class="kw">return</span> (h % <span class="kw">this</span>.fpMask) + <span class="nm">1</span>;
   }
 
+  <span class="cm">// Primary bucket: a different hash from _fp, masked to numBuckets.</span>
   _b1(item) {
     <span class="kw">return</span> murmur3(String(item), <span class="nm">0xb0f</span>) &amp; <span class="kw">this</span>.mask;
   }
 
+  <span class="cm">// THE MAGIC: alternate bucket = b XOR hash(fp).
+  // XOR is its own inverse, so applying _alt twice with the same
+  // fp returns to the start: _alt(_alt(b, fp), fp) === b.
+  // This is what lets us find an item's "other" bucket given only
+  // ITS FINGERPRINT — we never store or recover the original key.
+  // That's how cuckoo filters delete without remembering keys.</span>
   _alt(b, fp) {
-    <span class="cm">// XOR with hash(fp): involutive — alt(alt(b, fp), fp) === b</span>
     <span class="kw">return</span> (b ^ murmur3(String(fp), <span class="nm">0xb0f</span>)) &amp; <span class="kw">this</span>.mask;
   }
 
+  <span class="cm">// Slot a fingerprint into the first empty position in bucket b.
+  // O(bucketSize) — usually 4 — so effectively constant.</span>
   _tryInsert(b, fp) {
     <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.bucketSize; i++) {
       <span class="kw">if</span> (<span class="kw">this</span>.buckets[b][i] === <span class="nm">0</span>) {
@@ -383,30 +533,54 @@ footer a:hover{border-color:var(--ac);}
     <span class="kw">return false</span>;
   }
 
+  <span class="cm">// Insert: try b1 first, then bAlt. If both are full, randomly
+  // evict an existing fp and put it in ITS alt bucket. Repeat
+  // until something fits or we hit maxKicks (rebuild signal).</span>
   add(item) {
     <span class="kw">const</span> fp = <span class="kw">this</span>._fp(item);
     <span class="kw">let</span> b = <span class="kw">this</span>._b1(item);
     <span class="kw">if</span> (<span class="kw">this</span>._tryInsert(b, fp)) <span class="kw">return true</span>;
     <span class="kw">let</span> bAlt = <span class="kw">this</span>._alt(b, fp);
     <span class="kw">if</span> (<span class="kw">this</span>._tryInsert(bAlt, fp)) <span class="kw">return true</span>;
-    <span class="cm">// Evict and relocate</span>
+
+    <span class="cm">// Both candidate buckets full — start a kick chain. Random
+    // initial pick keeps load balanced. Each iteration evicts a
+    // random fp from the current bucket and tries to relocate it
+    // to ITS alternate. With 4-slot buckets and load ≤ 95%, kick
+    // chains terminate in &lt; 500 iterations with overwhelming prob.</span>
     <span class="kw">let</span> curB = Math.random() &lt; <span class="nm">0.5</span> ? b : bAlt;
     <span class="kw">let</span> curFp = fp;
     <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.maxKicks; i++) {
       <span class="kw">const</span> slot = Math.floor(Math.random() * <span class="kw">this</span>.bucketSize);
+      <span class="cm">// Swap: kick the existing fp out, hold it in curFp.</span>
       [<span class="kw">this</span>.buckets[curB][slot], curFp] = [curFp, <span class="kw">this</span>.buckets[curB][slot]];
       curB = <span class="kw">this</span>._alt(curB, curFp);
       <span class="kw">if</span> (<span class="kw">this</span>._tryInsert(curB, curFp)) <span class="kw">return true</span>;
     }
-    <span class="kw">return false</span>; <span class="cm">// Caller should rebuild into a larger filter</span>
+    <span class="cm">// Failed → filter is "full". Caller should resize: allocate
+    // a 2× CuckooFilter and re-insert all live fps from this one.</span>
+    <span class="kw">return false</span>;
   }
 
+  <span class="cm">// Membership: an item lives in either b1 or _alt(b1, fp). Check
+  // both. Worst-case 2 × bucketSize = 8 fingerprint comparisons.
+  // FPR = 2 · bucketSize / 2^fpBits (factor 2 = the two buckets).
+  // With fpBits=8, bucketSize=4 → FPR ≈ 0.031 (3.1%).
+  // Want better? Increase fpBits — every extra bit halves FPR.</span>
   has(item) {
     <span class="kw">const</span> fp = <span class="kw">this</span>._fp(item), b = <span class="kw">this</span>._b1(item);
     <span class="kw">if</span> (<span class="kw">this</span>.buckets[b].includes(fp)) <span class="kw">return true</span>;
     <span class="kw">return</span> <span class="kw">this</span>.buckets[<span class="kw">this</span>._alt(b, fp)].includes(fp);
   }
 
+  <span class="cm">// Delete: clear the first matching fp from either candidate bucket.
+  // Caveat: with collisions in fingerprint space, you might delete
+  // a DIFFERENT item that happened to have the same fp — but that's
+  // already accounted for in the FPR (it just means a future query
+  // for the original sees "absent", a normal false negative would
+  // not happen for items genuinely added… EXCEPT after this delete).
+  // Bottom line: as with counting filter, only delete items you've
+  // verified independently.</span>
   remove(item) {
     <span class="kw">const</span> fp = <span class="kw">this</span>._fp(item);
     <span class="kw">for</span> (<span class="kw">const</span> b <span class="kw">of</span> [<span class="kw">this</span>._b1(item), <span class="nm">0</span>]) {
@@ -427,6 +601,15 @@ footer a:hover{border-color:var(--ac);}
 <p>For time-windowed deduplication. Two filters alternate active/passive on a rotation schedule. Lookups check both. Memory is always exactly 2× a single filter; any item is "remembered" for at least one window and at most two.</p>
 <div class="dt-meta">// rotating · ~30 lines · sliding window dedup</div>
 <pre><code><span class="kw">class</span> RotatingBloomFilter {
+  <span class="cm">// Sliding-window dedup: "have I seen this in the last N minutes?"
+  // Two filters tag-team. New items go to active; lookups check
+  // both. When the window expires, active becomes previous and
+  // previous is dropped, giving a clean filter to fill.
+  //
+  // Memory cost: 2× a single filter — constant regardless of
+  // throughput.
+  // Retention: any item is remembered for at least one window
+  // (just inserted) and at most two (inserted right before rotation).</span>
   <span class="kw">constructor</span>(windowMs, n, p = <span class="nm">0.01</span>) {
     <span class="kw">this</span>.windowMs = windowMs;
     <span class="kw">this</span>.n = n;
@@ -436,6 +619,11 @@ footer a:hover{border-color:var(--ac);}
     <span class="kw">this</span>.rotatedAt = Date.now();
   }
 
+  <span class="cm">// Lazy rotation: fires on first call after windowMs elapses.
+  // No background timer needed — works in any sync runtime.
+  // Trade-off: a quiet filter rotates only on the next visit.
+  // For strict timing, schedule rotation via setInterval and call
+  // _maybeRotate() from there too.</span>
   _maybeRotate() {
     <span class="kw">if</span> (Date.now() - <span class="kw">this</span>.rotatedAt &gt; <span class="kw">this</span>.windowMs) {
       <span class="kw">this</span>.previous = <span class="kw">this</span>.active;
@@ -446,9 +634,11 @@ footer a:hover{border-color:var(--ac);}
 
   add(item) {
     <span class="kw">this</span>._maybeRotate();
-    <span class="kw">this</span>.active.add(item);
+    <span class="kw">this</span>.active.add(item);          <span class="cm">// writes only ever go to active</span>
   }
 
+  <span class="cm">// Lookup checks BOTH filters: an item added in the previous
+  // window is still "remembered" until that filter ages out.</span>
   has(item) {
     <span class="kw">this</span>._maybeRotate();
     <span class="kw">return this</span>.active.has(item) || <span class="kw">this</span>.previous.has(item);
@@ -460,12 +650,27 @@ footer a:hover{border-color:var(--ac);}
 <h2>8 — Test harness: <code>measureFPR</code></h2>
 <p>The most useful 20 lines you'll write. Insert n items, query 100,000 you didn't insert, count "maybe present" responses. Measured FPR should land within ±5% of theoretical for a well-sized filter.</p>
 <div class="dt-meta">// harness · ~25 lines · always run before deploying</div>
-<pre><code><span class="kw">function</span> measureFPR(BFClass, n, p, samples = <span class="nm">100_000</span>) {
+<pre><code><span class="cm">// The single most useful diagnostic for a bloom filter. Theory
+// says FPR ≈ p; reality often differs because of hash quality,
+// non-random keys, or under-sized m. Always run before deploying.
+//
+// How it works:
+//   Phase 1: insert n DISTINCT items.
+//   Phase 2: query `samples` items GUARANTEED to not be inserted.
+//   Every "true" return is a false positive (zero false negatives
+//   are possible by definition). Divide by samples → measured FPR.
+//
+// Convention: name inserted items "item:0", "item:1", … and probe
+// items "notitem:0", "notitem:1", … so namespaces never overlap.</span>
+<span class="kw">function</span> measureFPR(BFClass, n, p, samples = <span class="nm">100_000</span>) {
   <span class="kw">const</span> bf = <span class="kw">new</span> BFClass(n, p);
-  <span class="cm">// Phase 1: insert n distinct items</span>
+
+  <span class="cm">// Phase 1: warm up the filter to the operating point.</span>
   <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; n; i++) bf.add(<span class="st">`item:${i}`</span>);
 
-  <span class="cm">// Phase 2: query items guaranteed not to be in the filter</span>
+  <span class="cm">// Phase 2: 100k probes is enough to measure 1% FPR within ±10%
+  // (95% CI). For p ≤ 0.01 you may want samples ≥ 1M for a clean
+  // estimate.</span>
   <span class="kw">let</span> fp = <span class="nm">0</span>;
   <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; samples; i++) {
     <span class="kw">if</span> (bf.has(<span class="st">`notitem:${i}`</span>)) fp++;
@@ -477,13 +682,17 @@ footer a:hover{border-color:var(--ac);}
     measured,
     theoretical: p,
     ratio,
-    pass: ratio &gt;= <span class="nm">0.5</span> &amp;&amp; ratio &lt;= <span class="nm">2.0</span>,  <span class="cm">// generous bounds</span>
+    <span class="cm">// 0.5 ≤ ratio ≤ 2.0 is "well within Monte Carlo noise". A
+    // ratio &gt; 2 reliably signals a problem: bad hash, wrong m,
+    // or correlated input keys. A ratio &lt; 0.5 usually means an
+    // under-filled filter (n_actual &lt;&lt; n).</span>
+    pass: ratio &gt;= <span class="nm">0.5</span> &amp;&amp; ratio &lt;= <span class="nm">2.0</span>,
     m: bf.m,
     k: bf.k,
   };
 }
 
-<span class="cm">// Example: validate the standard filter</span>
+<span class="cm">// Smoke test for the standard filter — should print PASS.</span>
 <span class="kw">const</span> r = measureFPR(BloomFilter, <span class="nm">10000</span>, <span class="nm">0.01</span>);
 console.log(<span class="st">`measured ${(r.measured*100).toFixed(3)}% vs ${(r.theoretical*100).toFixed(3)}% (ratio ${r.ratio.toFixed(2)}) — ${r.pass ? 'PASS' : 'FAIL'}`</span>);</code></pre>
 <div class="run-demo">
