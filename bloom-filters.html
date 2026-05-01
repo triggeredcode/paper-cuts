@@ -168,9 +168,17 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15);}
 .pgd{display:grid;grid-template-columns:repeat(16,1fr);gap:4px;}
 .pb{aspect-ratio:1;border-radius:4px;background:var(--off);transition:background .3s,transform .2s;}
 .pb.p0{background:#3B6B50;}.pb.p1{background:#4A7A96;}.pb.p2{background:#C27C30;}
-.pipe{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:20px 0;}
-.pbox{padding:10px 14px;background:var(--sur);border:1px solid var(--bdr);border-radius:7px;font-size:13px;font-family:var(--mono);text-align:center;flex-shrink:0;}
-.parr{padding:0 4px;color:var(--txm);font-size:18px;}
+.pipe{display:grid;grid-template-columns:auto auto auto auto auto;align-items:center;gap:6px 4px;margin:20px 0;justify-content:start;}
+.pbox{padding:10px 14px;background:var(--sur);border:1px solid var(--bdr);border-radius:7px;font-size:13px;font-family:var(--mono);text-align:center;}
+.parr{padding:0 4px;color:var(--txm);font-size:18px;text-align:center;}
+.pbranch{display:grid;grid-template-rows:1fr 1fr;gap:6px;}
+.pjoin{position:relative;width:18px;align-self:stretch;}
+.pjoin::before,.pjoin::after{content:"";position:absolute;left:0;width:18px;height:1.5px;background:var(--txm);}
+.pjoin::before{top:25%;}.pjoin::after{top:75%;}
+.pjoin span{position:absolute;left:0;top:50%;width:1.5px;height:50%;background:var(--txm);transform:translate(0,-50%);}
+.pjoin .arr{position:absolute;left:13px;font-size:13px;color:var(--txm);}
+.pjoin .arr.t{top:calc(25% - 9px);}.pjoin .arr.b{top:calc(75% - 9px);}
+@media(max-width:520px){.pipe{grid-template-columns:1fr;}.pjoin{display:none;}.pbranch{grid-template-rows:auto auto;}}
 .reveal{opacity:0;transform:translateY(18px);transition:opacity .65s,transform .65s;}
 .reveal.vis{opacity:1;transform:none;}
 .apilist{display:flex;flex-direction:column;gap:14px;margin:24px 0;}
@@ -649,9 +657,9 @@ footer a:hover{border-bottom-color:var(--ac);}
       <tr><td>Duplicate inserts</td><td class="g">Idempotent</td><td class="g">Counter increments</td><td class="b">Only 2b/fingerprint</td></tr>
     </table></div>
     <div class="demo" style="margin:18px 0 0;">
-      <div class="dt">✦ The XOR property — alt(alt(b, fp), fp) = b</div>
-      <div class="cwrap"><svg id="cksv" viewBox="0 0 580 260" xmlns="http://www.w3.org/2000/svg"></svg></div>
-      <p style="font-size:13px;color:var(--txm);margin-top:12px;margin-bottom:0;line-height:1.55;">Bucket b XOR hash(fp) lands at bucket b'. XOR again with the same hash(fp) returns to b. That involution is what makes deletion possible without storing the original key.</p>
+      <div class="dt">✦ XOR is its own inverse — the round-trip property</div>
+      <div class="cwrap"><svg id="cksv" viewBox="0 0 580 300" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <p style="font-size:13px;color:var(--txm);margin-top:12px;margin-bottom:0;line-height:1.55;"><strong>Step 1 (insert):</strong> bucket b XOR hash(fp) lands at bucket b'. <strong>Step 2 (round-trip):</strong> b' XOR the same hash(fp) returns to b. This involution is what makes deletion possible without ever storing the original key.</p>
     </div>
     <p style="margin-top:18px;">For systems requiring deletion, the Cuckoo filter is generally preferable to the Counting filter due to ~3× better space efficiency. A max-displacement limit (e.g., 500 kicks) triggers a full rehash if exceeded — rare with proper sizing but must be handled. Full code lives on the <a href="bloom-filters-impl.html#cuckoo" style="color:var(--ac);text-decoration:none;border-bottom:1px solid var(--ac);">implementation page</a>.</p>
   </div>
@@ -665,10 +673,11 @@ footer a:hover{border-bottom-color:var(--ac);}
   <div class="pbox" style="background:rgba(59,107,80,.08);">Request</div>
   <div class="parr">→</div>
   <div class="pbox">Bloom check<br><span style="font-size:10px;color:var(--txm);">~10–100 ns</span></div>
-  <div class="parr">→</div>
-  <div class="pbox" style="background:rgba(185,64,64,.06);">Definitely absent<br><span style="font-size:10px;color:var(--rd);">skip expensive op</span></div>
-  <div class="parr" style="margin-left:4px;">↙</div>
-  <div class="pbox" style="background:rgba(194,124,48,.08);margin-left:4px;">Maybe present<br><span style="font-size:10px;color:var(--am);">→ disk / network / DB</span></div>
+  <div class="pjoin"><span></span><span class="arr t">→</span><span class="arr b">→</span></div>
+  <div class="pbranch">
+    <div class="pbox" style="background:rgba(185,64,64,.06);">Definitely absent<br><span style="font-size:10px;color:var(--rd);">skip expensive op (99%+)</span></div>
+    <div class="pbox" style="background:rgba(194,124,48,.08);">Maybe present<br><span style="font-size:10px;color:var(--am);">→ disk / network / DB</span></div>
+  </div>
 </div>
 <div class="cards">
   <div class="card">
@@ -1281,32 +1290,59 @@ mkPVis();
 }
 
 // ── Cuckoo XOR property (cksv) ──
+// Two-panel design: left shows insert (b → b'), right shows round-trip
+// (b' → b). Same operation, different start. Eliminates overlapping arrow
+// labels and makes the involution property visually unmistakable.
 {
-  const W=580,H=260,pad=30;
-  const numBuckets=8;
-  const bucketW=(W-2*pad)/numBuckets;
-  const bucketH=52;
+  const W=580,H=300;
   const fp=7,hashFp=5;
   const b=2,bAlt=b^hashFp;
-  const y1=66,y2=168;
+  const numBuckets=8;
+  const panelW=(W-30)/2;
+  const innerPad=10;
+  const bucketW=(panelW-2*innerPad)/numBuckets;
+  const bucketH=34;
   let parts=[];
-  const drawRow=(y,active,label,col)=>{
-    parts.push(`<text x="${pad}" y="${y-10}" font-size="13" font-family="Courier New" fill="${TH.inkMuted}">${label}</text>`);
+  parts.push(`<defs>
+    <marker id="arrFwd" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#C27C30"/></marker>
+    <marker id="arrBwd" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#3B6B50"/></marker>
+  </defs>`);
+
+  const panel=(xOff,title,fromIdx,fromLabel,toIdx,toLabel,col,markerId)=>{
+    parts.push(`<rect x="${xOff}" y="22" width="${panelW}" height="218" rx="8" fill="${TH.sur}" stroke="#E2DDD0" stroke-width="1"/>`);
+    parts.push(`<text x="${xOff+panelW/2}" y="44" text-anchor="middle" font-size="11" font-family="Courier New" fill="${TH.ink}" font-weight="bold" letter-spacing=".5">${title}</text>`);
+    const yF=72;
+    parts.push(`<text x="${xOff+innerPad}" y="${yF-7}" font-size="10" font-family="Courier New" fill="${TH.inkMuted}">${fromLabel}</text>`);
     for(let i=0;i<numBuckets;i++){
-      const x=pad+bucketW*i;
-      const isAct=i===active;
-      parts.push(`<rect x="${x+3}" y="${y}" width="${bucketW-6}" height="${bucketH}" rx="5" fill="${isAct?col:TH.sur}" stroke="${isAct?col:'#CEC9BC'}" stroke-width="${isAct?2.4:0.8}"/>`);
-      if(isAct)parts.push(`<text x="${x+bucketW/2}" y="${y+bucketH/2+5}" text-anchor="middle" font-size="15" font-family="Courier New" fill="#fff" font-weight="bold">fp=${fp}</text>`);
-      parts.push(`<text x="${x+bucketW/2}" y="${y+bucketH+18}" text-anchor="middle" font-size="11" font-family="Courier New" fill="${TH.axis}">${i}</text>`);
+      const x=xOff+innerPad+bucketW*i;
+      const isAct=i===fromIdx;
+      parts.push(`<rect x="${x+1.5}" y="${yF}" width="${bucketW-3}" height="${bucketH}" rx="3" fill="${isAct?col:'#FAF6EC'}" stroke="${isAct?col:'#CEC9BC'}" stroke-width="${isAct?1.8:0.6}"/>`);
+      if(isAct)parts.push(`<text x="${x+bucketW/2}" y="${yF+bucketH/2+4}" text-anchor="middle" font-size="11" font-family="Courier New" fill="#fff" font-weight="bold">fp=${fp}</text>`);
+      parts.push(`<text x="${x+bucketW/2}" y="${yF+bucketH+11}" text-anchor="middle" font-size="9" font-family="Courier New" fill="${TH.axis}">${i}</text>`);
+    }
+    const ax=xOff+innerPad+bucketW*(fromIdx+0.5);
+    const tx=xOff+innerPad+bucketW*(toIdx+0.5);
+    const arrY1=yF+bucketH+18,arrY2=arrY1+44;
+    const midX=(ax+tx)/2;
+    const ctrlY=(arrY1+arrY2)/2;
+    parts.push(`<path d="M ${ax} ${arrY1} Q ${midX} ${ctrlY} ${tx} ${arrY2}" stroke="${col}" stroke-width="1.6" fill="none" stroke-dasharray="4,3" marker-end="url(#${markerId})"/>`);
+    parts.push(`<text x="${midX}" y="${ctrlY-4}" text-anchor="middle" font-size="11" font-family="Courier New" fill="${col}" font-weight="bold">\u2295 hash(fp)</text>`);
+    const yT=yF+bucketH+62;
+    parts.push(`<text x="${xOff+innerPad}" y="${yT-7}" font-size="10" font-family="Courier New" fill="${TH.inkMuted}">${toLabel}</text>`);
+    for(let i=0;i<numBuckets;i++){
+      const x=xOff+innerPad+bucketW*i;
+      const isAct=i===toIdx;
+      parts.push(`<rect x="${x+1.5}" y="${yT}" width="${bucketW-3}" height="${bucketH}" rx="3" fill="${isAct?col:'#FAF6EC'}" stroke="${isAct?col:'#CEC9BC'}" stroke-width="${isAct?1.8:0.6}"/>`);
+      if(isAct)parts.push(`<text x="${x+bucketW/2}" y="${yT+bucketH/2+4}" text-anchor="middle" font-size="11" font-family="Courier New" fill="#fff" font-weight="bold">fp=${fp}</text>`);
+      parts.push(`<text x="${x+bucketW/2}" y="${yT+bucketH+11}" text-anchor="middle" font-size="9" font-family="Courier New" fill="${TH.axis}">${i}</text>`);
     }
   };
-  drawRow(y1,b,'primary bucket b','#3B6B50');
-  drawRow(y2,bAlt,'alternate b ⊕ hash(fp)','#4A7A96');
-  const ax1=pad+bucketW*(b+0.5),ax2=pad+bucketW*(bAlt+0.5);
-  parts.push(`<defs><marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#C27C30"/></marker></defs>`);
-  parts.push(`<path d="M ${ax1} ${y1+bucketH+24} Q ${(ax1+ax2)/2} ${y1+bucketH+50} ${ax2} ${y2-14}" stroke="#C27C30" stroke-width="1.8" fill="none" stroke-dasharray="5,4" marker-end="url(#arr)"/>`);
-  parts.push(`<text x="${W/2}" y="${H-32}" text-anchor="middle" font-size="14" font-family="Courier New" fill="${TH.ink}">b' = b ⊕ hash(fp)  ·  b'' = b' ⊕ hash(fp) = <tspan fill="#3B6B50" font-weight="bold">b</tspan></text>`);
-  parts.push(`<text x="${W/2}" y="${H-12}" text-anchor="middle" font-size="12" font-family="Lora,serif" fill="${TH.inkMuted}" font-style="italic">XOR is its own inverse — applying twice returns to start</text>`);
+
+  panel(15,'STEP 1 \u2014 INSERT',b,'primary  b='+b,bAlt,'alternate  b\u2032='+bAlt,'#C27C30','arrFwd');
+  panel(15+panelW,'STEP 2 \u2014 ROUND-TRIP',bAlt,'alternate  b\u2032='+bAlt,b,'primary  b='+b,'#3B6B50','arrBwd');
+
+  parts.push(`<text x="${W/2}" y="${H-30}" text-anchor="middle" font-size="13" font-family="Courier New" fill="${TH.ink}">b \u2295 hash(fp) = <tspan fill="#C27C30" font-weight="bold">b\u2032</tspan>     b\u2032 \u2295 hash(fp) = <tspan fill="#3B6B50" font-weight="bold">b</tspan></text>`);
+  parts.push(`<text x="${W/2}" y="${H-10}" text-anchor="middle" font-size="11" font-family="Lora,serif" fill="${TH.inkMuted}" font-style="italic">XOR is its own inverse — the same operation undoes itself</text>`);
   document.getElementById('cksv').innerHTML=parts.join('');
 }
 
