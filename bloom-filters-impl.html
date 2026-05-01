@@ -15,6 +15,19 @@
   --am:#C27C30;--rd:#B94040;--off:#D5D0C8;--bdr:#CEC9BC;
   --bl:#4A7A96;--pu:#7A60A8;
   --mono:'Courier New',monospace;
+  --pre-bg:#1A2420;--pre-fg:#A9D8B8;
+  --kw:#7fbfaf;--cm:#5A7A65;--st:#c8a96e;--nm:#c8d8e8;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#14110e;--sur:#1f1b16;--sur2:#26221c;
+    --tx:#ece6db;--txm:#a89f90;
+    --ac:#6FB088;--acm:#85C39C;--acg:rgba(111,176,136,.22);
+    --am:#DBA84E;--rd:#E87060;--off:#3a3530;--bdr:#3a3530;
+    --bl:#7AA9D4;--pu:#A283D0;
+    --pre-bg:#0d0b09;--pre-fg:#A9D8B8;
+    --kw:#9CD4C2;--cm:#7C9785;--st:#DBC591;--nm:#D4DDE8;
+  }
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
@@ -41,10 +54,10 @@ h3{font-family:'Fraunces',serif;font-size:19px;font-weight:300;font-style:italic
 p{margin-bottom:16px;}
 strong{font-weight:500;}em{font-style:italic;}
 code{font-family:var(--mono);font-size:.82em;background:var(--sur2);padding:2px 7px;border-radius:4px;color:var(--ac);}
-pre{background:#1A2420;color:#A9D8B8;padding:22px 24px;border-radius:10px;font-family:var(--mono);font-size:13px;line-height:1.7;overflow-x:auto;margin:20px 0;border:1px solid rgba(255,255,255,.04);position:relative;}
+pre{background:var(--pre-bg);color:var(--pre-fg);padding:22px 24px;border-radius:10px;font-family:var(--mono);font-size:13px;line-height:1.7;overflow-x:auto;margin:20px 0;border:1px solid rgba(255,255,255,.04);position:relative;}
 pre code{background:none;padding:0;color:inherit;font-size:inherit;}
-.kw{color:#7fbfaf;}.cm{color:#5A7A65;font-style:italic;}.st{color:#c8a96e;}.nm{color:#c8d8e8;}
-.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.06);color:#A9D8B8;border:1px solid rgba(255,255,255,.1);padding:4px 10px;border-radius:4px;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:.05em;text-transform:uppercase;opacity:0;transition:all .15s;}
+.kw{color:var(--kw);}.cm{color:var(--cm);font-style:italic;}.st{color:var(--st);}.nm{color:var(--nm);}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.06);color:var(--pre-fg);border:1px solid rgba(255,255,255,.1);padding:4px 10px;border-radius:4px;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:.05em;text-transform:uppercase;opacity:0;transition:all .15s;}
 pre:hover .copy-btn{opacity:1;}
 .copy-btn:hover{background:rgba(127,191,175,.16);}
 .copy-btn.ok{color:var(--ac);background:rgba(127,191,175,.2);}
