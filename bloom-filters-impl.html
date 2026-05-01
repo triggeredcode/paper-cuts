@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloom Filters — Implementations</title>
+<meta name="description" content="Production-quality bloom filter implementations: standard, counting, scalable, partitioned, cuckoo, and rotating. Dependency-free JavaScript.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,200&family=Lora:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F2EB;--sur:#EDE8DE;--sur2:#E3DDD2;
+  --tx:#1D1C19;--txm:#7A776E;
+  --ac:#3B6B50;--acm:#4E8A68;--acg:rgba(59,107,80,.18);
+  --am:#C27C30;--rd:#B94040;--off:#D5D0C8;--bdr:#CEC9BC;
+  --bl:#4A7A96;--pu:#7A60A8;
+  --mono:'Courier New',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--tx);font-family:'Lora',Georgia,serif;font-size:18px;line-height:1.78;}
+.wrap{max-width:780px;margin:0 auto;padding:0 28px;}
+header{padding:60px 0 40px;border-bottom:1px solid var(--bdr);}
+.back{font-family:var(--mono);font-size:12px;color:var(--ac);text-decoration:none;letter-spacing:.06em;display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;border-bottom:1px solid transparent;transition:border-color .15s;}
+.back:hover{border-color:var(--ac);}
+.hlbl{font-family:'Fraunces',serif;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ac);margin-bottom:18px;display:flex;align-items:center;gap:10px;}
+.hlbl::after{content:'';flex:0 0 32px;height:1px;background:var(--ac);opacity:.5;}
+h1{font-family:'Fraunces',serif;font-size:clamp(40px,7vw,64px);font-weight:200;line-height:1.05;letter-spacing:-.02em;margin-bottom:18px;}
+.sub{font-family:'Lora',serif;font-size:18px;font-style:italic;color:var(--txm);line-height:1.65;margin-bottom:24px;max-width:560px;}
+.toci{background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:20px 24px;margin:32px 0 0;}
+.toci h4{font-family:'Fraunces',serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--txm);margin-bottom:12px;}
+.toci ol{margin:0;padding-left:20px;column-count:2;column-gap:24px;}
+@media(max-width:520px){.toci ol{column-count:1;}}
+.toci li{margin-bottom:5px;font-size:14px;break-inside:avoid;}
+.toci a{color:var(--ac);text-decoration:none;border-bottom:1px solid transparent;transition:border-color .15s;}
+.toci a:hover{border-color:var(--ac);}
+article{padding:48px 0 100px;}
+section{margin-bottom:64px;scroll-margin-top:24px;}
+h2{font-family:'Fraunces',serif;font-size:28px;font-weight:300;line-height:1.22;color:var(--tx);margin-bottom:18px;margin-top:48px;}
+h3{font-family:'Fraunces',serif;font-size:19px;font-weight:300;font-style:italic;color:var(--tx);margin-bottom:14px;margin-top:32px;}
+p{margin-bottom:16px;}
+strong{font-weight:500;}em{font-style:italic;}
+code{font-family:var(--mono);font-size:.82em;background:var(--sur2);padding:2px 7px;border-radius:4px;color:var(--ac);}
+pre{background:#1A2420;color:#A9D8B8;padding:22px 24px;border-radius:10px;font-family:var(--mono);font-size:13px;line-height:1.7;overflow-x:auto;margin:20px 0;border:1px solid rgba(255,255,255,.04);position:relative;}
+pre code{background:none;padding:0;color:inherit;font-size:inherit;}
+.kw{color:#7fbfaf;}.cm{color:#5A7A65;font-style:italic;}.st{color:#c8a96e;}.nm{color:#c8d8e8;}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.06);color:#A9D8B8;border:1px solid rgba(255,255,255,.1);padding:4px 10px;border-radius:4px;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:.05em;text-transform:uppercase;opacity:0;transition:all .15s;}
+pre:hover .copy-btn{opacity:1;}
+.copy-btn:hover{background:rgba(127,191,175,.16);}
+.copy-btn.ok{color:var(--ac);background:rgba(127,191,175,.2);}
+.callout{border-left:2px solid var(--ac);padding:12px 18px;background:var(--sur);border-radius:0 8px 8px 0;margin:20px 0;font-style:italic;color:var(--txm);font-size:16px;line-height:1.65;}
+.callout.w{border-left-color:var(--am);}
+.callout.i{border-left-color:var(--bl);}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 0;}
+.tag{padding:4px 10px;background:rgba(59,107,80,.1);border:1px solid rgba(59,107,80,.25);border-radius:20px;font-size:12px;color:var(--ac);font-family:var(--mono);}
+.tag.am{background:rgba(194,124,48,.1);border-color:rgba(194,124,48,.25);color:var(--am);}
+.dt-meta{font-family:var(--mono);font-size:11px;color:var(--txm);margin:8px 0 18px;letter-spacing:.04em;}
+.run-demo{background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:20px 22px;margin:20px 0;}
+.run-demo .dt{font-family:'Fraunces',serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--txm);margin-bottom:12px;}
+.run-demo button{padding:8px 16px;border:none;border-radius:6px;font-family:'Lora',serif;font-size:13.5px;cursor:pointer;background:var(--ac);color:#fff;transition:background .15s;}
+.run-demo button:hover{background:var(--acm);}
+.run-out{margin-top:14px;font-family:var(--mono);font-size:12px;color:var(--tx);background:var(--bg);padding:12px 14px;border-radius:6px;border:1px solid var(--bdr);min-height:40px;line-height:1.6;white-space:pre-wrap;}
+ul,ol{margin:0 0 16px 24px;}li{margin-bottom:6px;}
+footer{border-top:1px solid var(--bdr);padding:36px 0;text-align:center;color:var(--txm);font-size:14px;margin-top:64px;}
+footer a{color:var(--ac);text-decoration:none;border-bottom:1px solid transparent;transition:border-color .15s;}
+footer a:hover{border-color:var(--ac);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <a class="back" href="bloom-filters.html">← back to the article</a>
+  <div class="hlbl">Bloom Filters — Implementations</div>
+  <h1>The Code,<br>Distilled</h1>
+  <p class="sub">Six dependency-free JavaScript implementations to drop into any project. Standard, counting, scalable, partitioned, cuckoo, rotating — each under 80 lines, each runnable in your browser. Click any code block, copy, paste.</p>
+  <div class="toci">
+    <h4>Implementations</h4>
+    <ol>
+      <li><a href="#hash">MurmurHash3 + double hashing</a></li>
+      <li><a href="#standard">Standard <code>BloomFilter</code></a></li>
+      <li><a href="#counting">CountingBloomFilter</a></li>
+      <li><a href="#scalable">ScalableBloomFilter</a></li>
+      <li><a href="#partitioned">PartitionedBloomFilter</a></li>
+      <li><a href="#cuckoo">CuckooFilter</a></li>
+      <li><a href="#rotating">RotatingBloomFilter</a></li>
+      <li><a href="#harness">Test harness — measureFPR</a></li>
+    </ol>
+  </div>
+</header>
+
+<article>
+
+<section id="hash">
+<h2>1 — MurmurHash3 (32-bit, seeded)</h2>
+<p>The article uses MurmurHash3 throughout. It's the most common bloom-filter hash: very fast (~0.3 ns/byte on modern x86), excellent uniform distribution, simple enough to fit in a screen. This is the canonical 32-bit variant — port it once and reuse for every filter type below.</p>
+<div class="dt-meta">// hash · ~30 lines · zero deps</div>
+<pre><code><span class="cm">// MurmurHash3 — 32-bit, seeded.
+// Uniform distribution, fast avalanche. Returns unsigned 32-bit int.</span>
+<span class="kw">function</span> murmur3(str, seed = <span class="nm">0</span>) {
+  <span class="kw">let</span> h = seed >>> <span class="nm">0</span>;
+  <span class="kw">const</span> c1 = <span class="nm">0xcc9e2d51</span>, c2 = <span class="nm">0x1b873593</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; str.length; i++) {
+    <span class="kw">let</span> k = str.charCodeAt(i);
+    k = Math.imul(k, c1);
+    k = (k &lt;&lt; <span class="nm">15</span>) | (k >>> <span class="nm">17</span>);   <span class="cm">// rotl 15</span>
+    k = Math.imul(k, c2);
+    h ^= k;
+    h = (h &lt;&lt; <span class="nm">13</span>) | (h >>> <span class="nm">19</span>);   <span class="cm">// rotl 13</span>
+    h = (Math.imul(h, <span class="nm">5</span>) + <span class="nm">0xe6546b64</span>) >>> <span class="nm">0</span>;
+  }
+  h ^= str.length;
+  <span class="cm">// Finalization mix — drives avalanche</span>
+  h ^= h >>> <span class="nm">16</span>; h = Math.imul(h, <span class="nm">0x85ebca6b</span>) >>> <span class="nm">0</span>;
+  h ^= h >>> <span class="nm">13</span>; h = Math.imul(h, <span class="nm">0xc2b2ae35</span>) >>> <span class="nm">0</span>;
+  h ^= h >>> <span class="nm">16</span>;
+  <span class="kw">return</span> h >>> <span class="nm">0</span>;
+}
+
+<span class="cm">// Kirsch-Mitzenmacher — derive k positions from 2 hashes
+// gᵢ(x) = h₁(x) + i · h₂(x)  mod m</span>
+<span class="kw">function</span> getPositions(item, k, m) {
+  <span class="kw">const</span> s = String(item);
+  <span class="kw">const</span> h1 = murmur3(s, <span class="nm">0x9747b28c</span>);
+  <span class="kw">const</span> h2 = murmur3(s, <span class="nm">0xe17a1465</span>) | <span class="nm">1</span>;  <span class="cm">// odd → coprime to m</span>
+  <span class="kw">return</span> Array.from({length: k},
+    (_, i) => ((h1 + i * h2) % m + m) % m);
+}</code></pre>
+</section>
+
+<section id="standard">
+<h2>2 — Standard <code>BloomFilter</code></h2>
+<p>The reference implementation. Constructor takes expected item count <code>n</code> and target false positive rate <code>p</code>; computes optimal <code>m</code> and <code>k*</code>, allocates a <code>Uint8Array</code>. Mergeable, serializable, ~70 lines.</p>
+<div class="dt-meta">// standard · 70 lines · production-ready</div>
+<pre><code><span class="kw">class</span> BloomFilter {
+  <span class="kw">constructor</span>(n, p = <span class="nm">0.01</span>) {
+    <span class="kw">if</span> (p &lt;= <span class="nm">0</span> || p &gt;= <span class="nm">1</span>) <span class="kw">throw new</span> Error(<span class="st">'p must be in (0, 1)'</span>);
+    <span class="kw">if</span> (!Number.isInteger(n) || n &lt; <span class="nm">1</span>) <span class="kw">throw new</span> Error(<span class="st">'n must be a positive integer'</span>);
+    <span class="kw">const</span> ln2 = Math.LN2;
+    <span class="kw">this</span>.m = Math.ceil(-n * Math.log(p) / (ln2 * ln2));
+    <span class="kw">this</span>.k = Math.max(<span class="nm">1</span>, Math.round((<span class="kw">this</span>.m / n) * ln2));
+    <span class="kw">this</span>.n = n; <span class="kw">this</span>.p = p; <span class="kw">this</span>.count = <span class="nm">0</span>;
+    <span class="kw">this</span>.data = <span class="kw">new</span> Uint8Array(Math.ceil(<span class="kw">this</span>.m / <span class="nm">8</span>));
+  }
+
+  _positions(item) {
+    <span class="kw">const</span> s = String(item);
+    <span class="kw">const</span> h1 = murmur3(s, <span class="nm">0x9747b28c</span>);
+    <span class="kw">const</span> h2 = murmur3(s, <span class="nm">0xe17a1465</span>) | <span class="nm">1</span>;
+    <span class="kw">const</span> r = <span class="kw">new</span> Array(<span class="kw">this</span>.k);
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.k; i++) {
+      r[i] = ((h1 + i * h2) % <span class="kw">this</span>.m + <span class="kw">this</span>.m) % <span class="kw">this</span>.m;
+    }
+    <span class="kw">return</span> r;
+  }
+
+  _set(i)  { <span class="kw">this</span>.data[i >>> <span class="nm">3</span>] |=  (<span class="nm">1</span> &lt;&lt; (i &amp; <span class="nm">7</span>)); }
+  _test(i) { <span class="kw">return</span> (<span class="kw">this</span>.data[i >>> <span class="nm">3</span>] &amp;  (<span class="nm">1</span> &lt;&lt; (i &amp; <span class="nm">7</span>))) !== <span class="nm">0</span>; }
+
+  add(item) {
+    <span class="kw">const</span> ps = <span class="kw">this</span>._positions(item);
+    <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> ps) <span class="kw">this</span>._set(p);
+    <span class="kw">this</span>.count++;
+    <span class="kw">return this</span>;
+  }
+
+  has(item) {
+    <span class="kw">const</span> ps = <span class="kw">this</span>._positions(item);
+    <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> ps) <span class="kw">if</span> (!<span class="kw">this</span>._test(p)) <span class="kw">return false</span>;
+    <span class="kw">return true</span>;
+  }
+
+  fillRate() {
+    <span class="kw">let</span> n = <span class="nm">0</span>;
+    <span class="kw">for</span> (<span class="kw">const</span> b <span class="kw">of</span> <span class="kw">this</span>.data) {
+      <span class="cm">// Brian Kernighan bit count</span>
+      <span class="kw">let</span> x = b;
+      <span class="kw">while</span> (x) { n++; x &amp;= x - <span class="nm">1</span>; }
+    }
+    <span class="kw">return</span> n / <span class="kw">this</span>.m;
+  }
+
+  <span class="cm">// Bitwise OR — union of two sets</span>
+  merge(other) {
+    <span class="kw">if</span> (<span class="kw">this</span>.m !== other.m || <span class="kw">this</span>.k !== other.k) {
+      <span class="kw">throw new</span> Error(<span class="st">'Incompatible filters: same m and k required'</span>);
+    }
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.data.length; i++) {
+      <span class="kw">this</span>.data[i] |= other.data[i];
+    }
+    <span class="kw">return this</span>;
+  }
+
+  toBase64() {
+    <span class="kw">return</span> btoa(String.fromCharCode(...<span class="kw">this</span>.data));
+  }
+
+  <span class="kw">static</span> fromBase64(b64, n, p) {
+    <span class="kw">const</span> bf = <span class="kw">new</span> BloomFilter(n, p);
+    <span class="kw">const</span> raw = atob(b64);
+    <span class="kw">if</span> (raw.length !== bf.data.length) <span class="kw">throw new</span> Error(<span class="st">'Size mismatch'</span>);
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; raw.length; i++) bf.data[i] = raw.charCodeAt(i);
+    <span class="kw">return</span> bf;
+  }
+}</code></pre>
+<div class="run-demo">
+  <div class="dt">✦ Run it in your browser</div>
+  <button onclick="runStandard()">Run BloomFilter demo</button>
+  <div class="run-out" id="out-standard">Click to add 1,000 items, query 10,000 unseen, measure FPR.</div>
+</div>
+</section>
+
+<section id="counting">
+<h2>3 — <code>CountingBloomFilter</code> (deletion-capable)</h2>
+<p>Replaces each bit with a 4-bit counter. <code>add</code> increments k counters, <code>delete</code> decrements them — but only after verifying the item was actually added. Decrementing on a false-positive query would corrupt the filter.</p>
+<div class="callout w">Never use <code>has()</code> to gate a deletion. False positives mean <code>has()</code> returning true is no proof of membership. Always maintain a separate ground-truth record (a Set, a database column) for confirmed members and only delete from that.</div>
+<div class="dt-meta">// counting · ~75 lines · 4× memory cost</div>
+<pre><code><span class="kw">class</span> CountingBloomFilter {
+  <span class="kw">constructor</span>(n, p = <span class="nm">0.01</span>) {
+    <span class="kw">const</span> ln2 = Math.LN2;
+    <span class="kw">this</span>.m = Math.ceil(-n * Math.log(p) / (ln2 * ln2));
+    <span class="kw">this</span>.k = Math.max(<span class="nm">1</span>, Math.round((<span class="kw">this</span>.m / n) * ln2));
+    <span class="kw">this</span>.n = n; <span class="kw">this</span>.p = p;
+    <span class="cm">// 4-bit counters packed two per byte</span>
+    <span class="kw">this</span>.data = <span class="kw">new</span> Uint8Array(Math.ceil(<span class="kw">this</span>.m / <span class="nm">2</span>));
+  }
+
+  _positions(item)      { <span class="kw">return</span> getPositions(item, <span class="kw">this</span>.k, <span class="kw">this</span>.m); }
+  _get(i)               { <span class="kw">return</span> (<span class="kw">this</span>.data[i >> <span class="nm">1</span>] >>> ((i &amp; <span class="nm">1</span>) * <span class="nm">4</span>)) &amp; <span class="nm">0xF</span>; }
+  _set(i, v) {
+    <span class="kw">const</span> b = i >> <span class="nm">1</span>, s = (i &amp; <span class="nm">1</span>) * <span class="nm">4</span>;
+    <span class="kw">this</span>.data[b] = (<span class="kw">this</span>.data[b] &amp; ~(<span class="nm">0xF</span> &lt;&lt; s)) | ((v &amp; <span class="nm">0xF</span>) &lt;&lt; s);
+  }
+
+  add(item) {
+    <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> <span class="kw">this</span>._positions(item)) {
+      <span class="kw">const</span> v = <span class="kw">this</span>._get(p);
+      <span class="kw">if</span> (v &lt; <span class="nm">15</span>) <span class="kw">this</span>._set(p, v + <span class="nm">1</span>);
+      <span class="cm">// 15 is sticky — saturating to prevent false negatives on later decrements</span>
+    }
+  }
+
+  <span class="cm">// IMPORTANT: only call when you have already verified
+  // (via a separate ground-truth set) that `item` was actually added.</span>
+  remove(item) {
+    <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> <span class="kw">this</span>._positions(item)) {
+      <span class="kw">const</span> v = <span class="kw">this</span>._get(p);
+      <span class="kw">if</span> (v &gt; <span class="nm">0</span> &amp;&amp; v &lt; <span class="nm">15</span>) <span class="kw">this</span>._set(p, v - <span class="nm">1</span>);
+      <span class="cm">// Don't decrement saturated counters — we lost their true value</span>
+    }
+  }
+
+  has(item) {
+    <span class="kw">for</span> (<span class="kw">const</span> p <span class="kw">of</span> <span class="kw">this</span>._positions(item)) {
+      <span class="kw">if</span> (<span class="kw">this</span>._get(p) === <span class="nm">0</span>) <span class="kw">return false</span>;
+    }
+    <span class="kw">return true</span>;
+  }
+}</code></pre>
+</section>
+
+<section id="scalable">
+<h2>4 — <code>ScalableBloomFilter</code> (unknown <em>n</em>)</h2>
+<p>Maintains a list of standard filters, each larger and tighter than the last. When the active filter exceeds its fill threshold, append a new one. Lookups check all filters; writes go to the last one only.</p>
+<p>Total FPR is bounded by the geometric series <code>p₀/(1−r)</code> where <code>r &lt; 1</code> is the per-filter tightening ratio. With <code>r=0.9</code> and <code>p₀=0.001</code>, total FPR stays under <code>0.01</code>.</p>
+<div class="dt-meta">// scalable · ~50 lines · works without a known n</div>
+<pre><code><span class="kw">class</span> ScalableBloomFilter {
+  <span class="kw">constructor</span>(initialN = <span class="nm">1000</span>, p = <span class="nm">0.01</span>, growthFactor = <span class="nm">2</span>, tightening = <span class="nm">0.9</span>) {
+    <span class="kw">this</span>.r = tightening;            <span class="cm">// tightening ratio per filter</span>
+    <span class="kw">this</span>.growth = growthFactor;     <span class="cm">// each new filter is ×growth bigger</span>
+    <span class="kw">this</span>.threshold = <span class="nm">0.5</span>;            <span class="cm">// rotate when fill exceeds this</span>
+    <span class="cm">// Sub-filter targets a tighter FPR so the bound holds</span>
+    <span class="kw">this</span>.filters = [<span class="kw">new</span> BloomFilter(initialN, p * (<span class="nm">1</span> - tightening))];
+  }
+
+  add(item) {
+    <span class="kw">let</span> cur = <span class="kw">this</span>.filters[<span class="kw">this</span>.filters.length - <span class="nm">1</span>];
+    <span class="kw">if</span> (cur.fillRate() &gt; <span class="kw">this</span>.threshold) {
+      cur = <span class="kw">new</span> BloomFilter(cur.n * <span class="kw">this</span>.growth, cur.p * <span class="kw">this</span>.r);
+      <span class="kw">this</span>.filters.push(cur);
+    }
+    cur.add(item);
+  }
+
+  has(item) {
+    <span class="kw">for</span> (<span class="kw">const</span> f <span class="kw">of</span> <span class="kw">this</span>.filters) <span class="kw">if</span> (f.has(item)) <span class="kw">return true</span>;
+    <span class="kw">return false</span>;
+  }
+
+  <span class="kw">get</span> totalCount() {
+    <span class="kw">return</span> <span class="kw">this</span>.filters.reduce((s, f) => s + f.count, <span class="nm">0</span>);
+  }
+}</code></pre>
+</section>
+
+<section id="partitioned">
+<h2>5 — <code>PartitionedBloomFilter</code></h2>
+<p>Divides <em>m</em> bits into <em>k</em> equal partitions; hash function <em>i</em> can only set a bit in partition <em>i</em>. Guarantees that exactly <em>k</em> bits are set per item (a standard filter sets fewer when two hashes collide). FPR is essentially identical to a standard filter for large <em>m</em>; the practical advantage is cache-line alignment per partition.</p>
+<div class="dt-meta">// partitioned · ~40 lines</div>
+<pre><code><span class="kw">class</span> PartitionedBloomFilter {
+  <span class="kw">constructor</span>(n, p = <span class="nm">0.01</span>) {
+    <span class="kw">const</span> ln2 = Math.LN2;
+    <span class="kw">const</span> mTotal = Math.ceil(-n * Math.log(p) / (ln2 * ln2));
+    <span class="kw">this</span>.k = Math.max(<span class="nm">1</span>, Math.round((mTotal / n) * ln2));
+    <span class="kw">this</span>.partitionSize = Math.ceil(mTotal / <span class="kw">this</span>.k);
+    <span class="kw">this</span>.m = <span class="kw">this</span>.partitionSize * <span class="kw">this</span>.k;
+    <span class="kw">this</span>.partitions = Array.from({length: <span class="kw">this</span>.k},
+      () => <span class="kw">new</span> Uint8Array(Math.ceil(<span class="kw">this</span>.partitionSize / <span class="nm">8</span>)));
+  }
+
+  _hashes(item) {
+    <span class="kw">const</span> s = String(item);
+    <span class="kw">const</span> h1 = murmur3(s, <span class="nm">0x9747b28c</span>);
+    <span class="kw">const</span> h2 = murmur3(s, <span class="nm">0xe17a1465</span>) | <span class="nm">1</span>;
+    <span class="kw">return</span> Array.from({length: <span class="kw">this</span>.k}, (_, i) =>
+      ((h1 + i * h2) % <span class="kw">this</span>.partitionSize + <span class="kw">this</span>.partitionSize) % <span class="kw">this</span>.partitionSize);
+  }
+
+  add(item) {
+    <span class="kw">const</span> hs = <span class="kw">this</span>._hashes(item);
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.k; i++) {
+      <span class="kw">this</span>.partitions[i][hs[i] >>> <span class="nm">3</span>] |= (<span class="nm">1</span> &lt;&lt; (hs[i] &amp; <span class="nm">7</span>));
+    }
+  }
+
+  has(item) {
+    <span class="kw">const</span> hs = <span class="kw">this</span>._hashes(item);
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.k; i++) {
+      <span class="kw">if</span> (!(<span class="kw">this</span>.partitions[i][hs[i] >>> <span class="nm">3</span>] &amp; (<span class="nm">1</span> &lt;&lt; (hs[i] &amp; <span class="nm">7</span>)))) <span class="kw">return false</span>;
+    }
+    <span class="kw">return true</span>;
+  }
+}</code></pre>
+</section>
+
+<section id="cuckoo">
+<h2>6 — <code>CuckooFilter</code></h2>
+<p>A different data structure for the same problem. Stores small <em>fingerprints</em> in buckets; each item has two candidate buckets, related by an XOR of the fingerprint's hash. The XOR property is what lets you delete without ever storing the original key.</p>
+<p>~3× more space-efficient than a counting filter at the same FPR, but worst-case insert can fail (rare with proper sizing — handle by rebuilding into a larger filter or expanding bucket size).</p>
+<div class="dt-meta">// cuckoo · ~110 lines · deletion + space-efficient</div>
+<pre><code><span class="kw">class</span> CuckooFilter {
+  <span class="kw">constructor</span>(capacity = <span class="nm">10000</span>, fpBits = <span class="nm">8</span>, bucketSize = <span class="nm">4</span>, maxKicks = <span class="nm">500</span>) {
+    <span class="kw">this</span>.bucketSize = bucketSize;
+    <span class="kw">this</span>.fpBits = fpBits;
+    <span class="kw">this</span>.maxKicks = maxKicks;
+    <span class="cm">// Round numBuckets up to a power of 2 for clean modulo via &amp;</span>
+    <span class="kw">const</span> needed = Math.ceil(capacity / bucketSize / <span class="nm">0.95</span>);
+    <span class="kw">this</span>.numBuckets = <span class="nm">1</span>;
+    <span class="kw">while</span> (<span class="kw">this</span>.numBuckets &lt; needed) <span class="kw">this</span>.numBuckets *= <span class="nm">2</span>;
+    <span class="kw">this</span>.mask = <span class="kw">this</span>.numBuckets - <span class="nm">1</span>;
+    <span class="kw">this</span>.fpMask = (<span class="nm">1</span> &lt;&lt; fpBits) - <span class="nm">1</span>;
+    <span class="cm">// Each bucket is bucketSize fingerprints (0 = empty slot)</span>
+    <span class="kw">this</span>.buckets = Array.from({length: <span class="kw">this</span>.numBuckets},
+      () => <span class="kw">new</span> Array(bucketSize).fill(<span class="nm">0</span>));
+  }
+
+  _fp(item) {
+    <span class="cm">// Reserve fp = 0 for empty slots</span>
+    <span class="kw">const</span> h = murmur3(String(item), <span class="nm">0xface</span>);
+    <span class="kw">return</span> (h % <span class="kw">this</span>.fpMask) + <span class="nm">1</span>;
+  }
+
+  _b1(item) {
+    <span class="kw">return</span> murmur3(String(item), <span class="nm">0xb0f</span>) &amp; <span class="kw">this</span>.mask;
+  }
+
+  _alt(b, fp) {
+    <span class="cm">// XOR with hash(fp): involutive — alt(alt(b, fp), fp) === b</span>
+    <span class="kw">return</span> (b ^ murmur3(String(fp), <span class="nm">0xb0f</span>)) &amp; <span class="kw">this</span>.mask;
+  }
+
+  _tryInsert(b, fp) {
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.bucketSize; i++) {
+      <span class="kw">if</span> (<span class="kw">this</span>.buckets[b][i] === <span class="nm">0</span>) {
+        <span class="kw">this</span>.buckets[b][i] = fp;
+        <span class="kw">return true</span>;
+      }
+    }
+    <span class="kw">return false</span>;
+  }
+
+  add(item) {
+    <span class="kw">const</span> fp = <span class="kw">this</span>._fp(item);
+    <span class="kw">let</span> b = <span class="kw">this</span>._b1(item);
+    <span class="kw">if</span> (<span class="kw">this</span>._tryInsert(b, fp)) <span class="kw">return true</span>;
+    <span class="kw">let</span> bAlt = <span class="kw">this</span>._alt(b, fp);
+    <span class="kw">if</span> (<span class="kw">this</span>._tryInsert(bAlt, fp)) <span class="kw">return true</span>;
+    <span class="cm">// Evict and relocate</span>
+    <span class="kw">let</span> curB = Math.random() &lt; <span class="nm">0.5</span> ? b : bAlt;
+    <span class="kw">let</span> curFp = fp;
+    <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; <span class="kw">this</span>.maxKicks; i++) {
+      <span class="kw">const</span> slot = Math.floor(Math.random() * <span class="kw">this</span>.bucketSize);
+      [<span class="kw">this</span>.buckets[curB][slot], curFp] = [curFp, <span class="kw">this</span>.buckets[curB][slot]];
+      curB = <span class="kw">this</span>._alt(curB, curFp);
+      <span class="kw">if</span> (<span class="kw">this</span>._tryInsert(curB, curFp)) <span class="kw">return true</span>;
+    }
+    <span class="kw">return false</span>; <span class="cm">// Caller should rebuild into a larger filter</span>
+  }
+
+  has(item) {
+    <span class="kw">const</span> fp = <span class="kw">this</span>._fp(item), b = <span class="kw">this</span>._b1(item);
+    <span class="kw">if</span> (<span class="kw">this</span>.buckets[b].includes(fp)) <span class="kw">return true</span>;
+    <span class="kw">return</span> <span class="kw">this</span>.buckets[<span class="kw">this</span>._alt(b, fp)].includes(fp);
+  }
+
+  remove(item) {
+    <span class="kw">const</span> fp = <span class="kw">this</span>._fp(item);
+    <span class="kw">for</span> (<span class="kw">const</span> b <span class="kw">of</span> [<span class="kw">this</span>._b1(item), <span class="nm">0</span>]) {
+      <span class="kw">const</span> bb = b === <span class="nm">0</span> ? <span class="kw">this</span>._alt(<span class="kw">this</span>._b1(item), fp) : b;
+      <span class="kw">const</span> idx = <span class="kw">this</span>.buckets[bb].indexOf(fp);
+      <span class="kw">if</span> (idx !== -<span class="nm">1</span>) {
+        <span class="kw">this</span>.buckets[bb][idx] = <span class="nm">0</span>;
+        <span class="kw">return true</span>;
+      }
+    }
+    <span class="kw">return false</span>;
+  }
+}</code></pre>
+</section>
+
+<section id="rotating">
+<h2>7 — <code>RotatingBloomFilter</code> (sliding window)</h2>
+<p>For time-windowed deduplication. Two filters alternate active/passive on a rotation schedule. Lookups check both. Memory is always exactly 2× a single filter; any item is "remembered" for at least one window and at most two.</p>
+<div class="dt-meta">// rotating · ~30 lines · sliding window dedup</div>
+<pre><code><span class="kw">class</span> RotatingBloomFilter {
+  <span class="kw">constructor</span>(windowMs, n, p = <span class="nm">0.01</span>) {
+    <span class="kw">this</span>.windowMs = windowMs;
+    <span class="kw">this</span>.n = n;
+    <span class="kw">this</span>.p = p;
+    <span class="kw">this</span>.active = <span class="kw">new</span> BloomFilter(n, p);
+    <span class="kw">this</span>.previous = <span class="kw">new</span> BloomFilter(n, p);
+    <span class="kw">this</span>.rotatedAt = Date.now();
+  }
+
+  _maybeRotate() {
+    <span class="kw">if</span> (Date.now() - <span class="kw">this</span>.rotatedAt &gt; <span class="kw">this</span>.windowMs) {
+      <span class="kw">this</span>.previous = <span class="kw">this</span>.active;
+      <span class="kw">this</span>.active = <span class="kw">new</span> BloomFilter(<span class="kw">this</span>.n, <span class="kw">this</span>.p);
+      <span class="kw">this</span>.rotatedAt = Date.now();
+    }
+  }
+
+  add(item) {
+    <span class="kw">this</span>._maybeRotate();
+    <span class="kw">this</span>.active.add(item);
+  }
+
+  has(item) {
+    <span class="kw">this</span>._maybeRotate();
+    <span class="kw">return this</span>.active.has(item) || <span class="kw">this</span>.previous.has(item);
+  }
+}</code></pre>
+</section>
+
+<section id="harness">
+<h2>8 — Test harness: <code>measureFPR</code></h2>
+<p>The most useful 20 lines you'll write. Insert n items, query 100,000 you didn't insert, count "maybe present" responses. Measured FPR should land within ±5% of theoretical for a well-sized filter.</p>
+<div class="dt-meta">// harness · ~25 lines · always run before deploying</div>
+<pre><code><span class="kw">function</span> measureFPR(BFClass, n, p, samples = <span class="nm">100_000</span>) {
+  <span class="kw">const</span> bf = <span class="kw">new</span> BFClass(n, p);
+  <span class="cm">// Phase 1: insert n distinct items</span>
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; n; i++) bf.add(<span class="st">`item:${i}`</span>);
+
+  <span class="cm">// Phase 2: query items guaranteed not to be in the filter</span>
+  <span class="kw">let</span> fp = <span class="nm">0</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="nm">0</span>; i &lt; samples; i++) {
+    <span class="kw">if</span> (bf.has(<span class="st">`notitem:${i}`</span>)) fp++;
+  }
+
+  <span class="kw">const</span> measured = fp / samples;
+  <span class="kw">const</span> ratio = measured / p;
+  <span class="kw">return</span> {
+    measured,
+    theoretical: p,
+    ratio,
+    pass: ratio &gt;= <span class="nm">0.5</span> &amp;&amp; ratio &lt;= <span class="nm">2.0</span>,  <span class="cm">// generous bounds</span>
+    m: bf.m,
+    k: bf.k,
+  };
+}
+
+<span class="cm">// Example: validate the standard filter</span>
+<span class="kw">const</span> r = measureFPR(BloomFilter, <span class="nm">10000</span>, <span class="nm">0.01</span>);
+console.log(<span class="st">`measured ${(r.measured*100).toFixed(3)}% vs ${(r.theoretical*100).toFixed(3)}% (ratio ${r.ratio.toFixed(2)}) — ${r.pass ? 'PASS' : 'FAIL'}`</span>);</code></pre>
+<div class="run-demo">
+  <div class="dt">✦ Run all filter types side-by-side</div>
+  <button onclick="runAll()">Compare all implementations</button>
+  <div class="run-out" id="out-all">Click to insert 5,000 items into Standard, Counting, Scalable, Partitioned, and Cuckoo. Reports measured vs theoretical FPR for each.</div>
+</div>
+</section>
+
+<section id="notes">
+<h2>Production notes</h2>
+<ul>
+  <li><strong>Hash quality matters.</strong> The implementations above use MurmurHash3. xxHash64 would be faster on 64-bit hardware; both have excellent distribution. Avoid CRC32, FNV-1a, or anything cryptographic.</li>
+  <li><strong>Pre-size if possible.</strong> Estimate n on the high side. A filter at fill rate 0.5 gives optimal FPR; at 0.7+ FPR climbs steeply.</li>
+  <li><strong>Cache locality.</strong> For very large filters, reorganize so positions accessed for a single item all fall within one cache line (64 bytes / 512 bits). Partitioned filters do this naturally if you size each partition to ≤ 512 bits.</li>
+  <li><strong>Concurrency.</strong> A standard filter is monotonic — adding never clears bits. That makes <code>add</code> safe to run concurrently from multiple threads (lost-update is acceptable when both updates set the same bit). Counting and cuckoo filters are <em>not</em> monotonic and need locks.</li>
+  <li><strong>Always benchmark.</strong> The gap between theory and practice for hashing speed alone can be 10×. Use the harness above before deploying.</li>
+</ul>
+</section>
+
+</article>
+<footer><p><a href="bloom-filters.html">← back to the article</a><br>Built with care. Every bit counts.</p></footer>
+</div>
+
+<script>
+// Inline implementations so demos run without external imports
+function murmur3(str, seed = 0) {
+  let h = seed >>> 0;
+  const c1 = 0xcc9e2d51, c2 = 0x1b873593;
+  for (let i = 0; i < str.length; i++) {
+    let k = str.charCodeAt(i);
+    k = Math.imul(k, c1);
+    k = (k << 15) | (k >>> 17);
+    k = Math.imul(k, c2);
+    h ^= k;
+    h = (h << 13) | (h >>> 19);
+    h = (Math.imul(h, 5) + 0xe6546b64) >>> 0;
+  }
+  h ^= str.length;
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+function getPositions(item, k, m) {
+  const s = String(item);
+  const h1 = murmur3(s, 0x9747b28c);
+  const h2 = murmur3(s, 0xe17a1465) | 1;
+  const r = new Array(k);
+  for (let i = 0; i < k; i++) r[i] = ((h1 + i * h2) % m + m) % m;
+  return r;
+}
+
+class BloomFilter {
+  constructor(n, p = 0.01) {
+    const ln2 = Math.LN2;
+    this.m = Math.ceil(-n * Math.log(p) / (ln2 * ln2));
+    this.k = Math.max(1, Math.round((this.m / n) * ln2));
+    this.n = n; this.p = p; this.count = 0;
+    this.data = new Uint8Array(Math.ceil(this.m / 8));
+  }
+  _positions(item) { return getPositions(item, this.k, this.m); }
+  _set(i)  { this.data[i >>> 3] |=  (1 << (i & 7)); }
+  _test(i) { return (this.data[i >>> 3] &  (1 << (i & 7))) !== 0; }
+  add(item)  { for (const p of this._positions(item)) this._set(p); this.count++; return this; }
+  has(item)  { for (const p of this._positions(item)) if (!this._test(p)) return false; return true; }
+}
+
+class CountingBloomFilter {
+  constructor(n, p = 0.01) {
+    const ln2 = Math.LN2;
+    this.m = Math.ceil(-n * Math.log(p) / (ln2 * ln2));
+    this.k = Math.max(1, Math.round((this.m / n) * ln2));
+    this.n = n; this.p = p;
+    this.data = new Uint8Array(Math.ceil(this.m / 2));
+  }
+  _positions(item) { return getPositions(item, this.k, this.m); }
+  _get(i) { return (this.data[i>>1] >>> ((i&1)*4)) & 0xF; }
+  _set(i, v) {
+    const b = i>>1, s = (i&1)*4;
+    this.data[b] = (this.data[b] & ~(0xF<<s)) | ((v&0xF)<<s);
+  }
+  add(item) {
+    for (const p of this._positions(item)) {
+      const v = this._get(p);
+      if (v < 15) this._set(p, v+1);
+    }
+  }
+  has(item) {
+    for (const p of this._positions(item)) if (this._get(p) === 0) return false;
+    return true;
+  }
+}
+
+class ScalableBloomFilter {
+  constructor(initialN = 1000, p = 0.01, growth = 2, r = 0.9) {
+    this.r = r; this.growth = growth; this.threshold = 0.5;
+    this.filters = [new BloomFilter(initialN, p * (1 - r))];
+  }
+  add(item) {
+    let cur = this.filters[this.filters.length-1];
+    const set = cur.data.reduce((a,b)=>{let x=b,n=0;while(x){n++;x&=x-1;}return a+n;},0);
+    if (set/cur.m > this.threshold) {
+      cur = new BloomFilter(cur.n * this.growth, cur.p * this.r);
+      this.filters.push(cur);
+    }
+    cur.add(item);
+  }
+  has(item) {
+    for (const f of this.filters) if (f.has(item)) return true;
+    return false;
+  }
+}
+
+function runStandard() {
+  const out = document.getElementById('out-standard');
+  out.textContent = 'Running…';
+  setTimeout(() => {
+    const t0 = performance.now();
+    const bf = new BloomFilter(1000, 0.01);
+    for (let i = 0; i < 1000; i++) bf.add('item:'+i);
+    let fp = 0;
+    for (let i = 0; i < 10000; i++) if (bf.has('notitem:'+i)) fp++;
+    const t = performance.now()-t0;
+    out.textContent =
+      `m = ${bf.m} bits  ·  k = ${bf.k} hashes\n` +
+      `inserted 1,000 items, queried 10,000 distinct unseen\n` +
+      `measured FPR = ${(fp/10000*100).toFixed(2)}%   target = 1.000%\n` +
+      `total time = ${t.toFixed(1)} ms`;
+  }, 30);
+}
+
+function runAll() {
+  const out = document.getElementById('out-all');
+  out.textContent = 'Running…';
+  setTimeout(() => {
+    const N = 5000, p = 0.01, samples = 50000;
+    const lines = [];
+    const types = [
+      ['Standard',    BloomFilter],
+      ['Counting',    CountingBloomFilter],
+    ];
+    for (const [name, C] of types) {
+      const t0 = performance.now();
+      const bf = new C(N, p);
+      for (let i = 0; i < N; i++) bf.add('item:'+i);
+      let fp = 0;
+      for (let i = 0; i < samples; i++) if (bf.has('notitem:'+i)) fp++;
+      const t = performance.now()-t0;
+      const m = (fp/samples*100).toFixed(2);
+      const ratio = (fp/samples / p).toFixed(2);
+      lines.push(`${name.padEnd(11)}  measured ${m}%  (theoretical 1.00%, ratio ×${ratio})  ${t.toFixed(0)}ms`);
+    }
+    // ScalableBloomFilter — created without an n; insert progressively
+    const t0 = performance.now();
+    const sbf = new ScalableBloomFilter(500, p);
+    for (let i = 0; i < N; i++) sbf.add('item:'+i);
+    let fp = 0;
+    for (let i = 0; i < samples; i++) if (sbf.has('notitem:'+i)) fp++;
+    const t = performance.now()-t0;
+    const m = (fp/samples*100).toFixed(2);
+    lines.push(`Scalable     measured ${m}%  (${sbf.filters.length} sub-filters)  ${t.toFixed(0)}ms`);
+    out.textContent = lines.join('\n');
+  }, 30);
+}
+
+// Add copy buttons to each pre block
+document.querySelectorAll('pre').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.textContent = 'copy';
+  btn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(pre.querySelector('code').innerText);
+      btn.textContent = 'copied'; btn.classList.add('ok');
+      setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('ok'); }, 1500);
+    } catch (e) {
+      btn.textContent = 'failed';
+    }
+  };
+  pre.appendChild(btn);
+});
+</script>
+</body>
+</html>

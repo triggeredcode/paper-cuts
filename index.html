@@ -7,19 +7,19 @@
 <meta name="theme-color" content="#1a1714" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='4' width='24' height='24' rx='3' fill='%23faf8f3' stroke='%232a2520' stroke-width='1.4'/><line x1='8' y1='9' x2='24' y2='25' stroke='%232a2520' stroke-width='1.6' stroke-linecap='round'/></svg>">
-<title>Paper Cuts — Essay & Interactive Playground</title>
-<meta name="description" content="A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions. Read the essay, then play the game.">
+<title>Paper Cuts — Notes on Algorithms, Geometry &amp; Data Structures</title>
+<meta name="description" content="A small collection of writings about algorithms, computational geometry, and probabilistic data structures. Each one a deep dive with interactive demos.">
 <meta name="author" content="@omkar_builds">
 
 <meta property="og:type" content="website">
-<meta property="og:title" content="Paper Cuts — Essay & Interactive Playground">
-<meta property="og:description" content="Read the essay, then play the game. A deceptively simple DSA problem about decomposition.">
+<meta property="og:title" content="Paper Cuts — Notes on Algorithms, Geometry &amp; Data Structures">
+<meta property="og:description" content="Small collection of writings: deep dives into algorithms and data structures with interactive demos.">
 <meta property="og:site_name" content="Paper Cuts">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:creator" content="@omkar_builds">
-<meta name="twitter:title" content="Paper Cuts — Essay & Interactive Playground">
-<meta name="twitter:description" content="Read the essay, then play the game.">
+<meta name="twitter:title" content="Paper Cuts — Notes on Algorithms, Geometry &amp; Data Structures">
+<meta name="twitter:description" content="Small collection of writings: deep dives into algorithms and data structures with interactive demos.">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,6 +35,7 @@
     --paper-card: #ffffff;
     --red: #c0392b;
     --amber: #C8913A;
+    --sage: #3B6B50;
     --walnut: #271C15;
     --border: rgba(26,23,20,0.12);
     --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px -8px rgba(60,40,20,0.16);
@@ -50,6 +51,7 @@
       --paper-card: #1f1b16;
       --red: #e87060;
       --amber: #DBA84E;
+      --sage: #6FB088;
       --walnut: #ece6db;
       --border: rgba(236,230,219,0.14);
       --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -8px rgba(0,0,0,0.5);
@@ -144,9 +146,12 @@
   /* card grid */
   .card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: clamp(1rem, 2.5vw, 1.75rem);
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: clamp(1rem, 2.5vw, 1.5rem);
     margin-bottom: clamp(2.5rem, 5vw, 4rem);
+  }
+  @media (min-width: 760px) {
+    .card-grid { grid-template-columns: repeat(3, 1fr); }
   }
 
   .card {
@@ -179,9 +184,9 @@
     position: absolute;
     top: 1.2rem;
     right: 1.2rem;
-    width: 64px;
-    height: 64px;
-    opacity: 0.55;
+    width: 56px;
+    height: 56px;
+    opacity: 0.5;
     pointer-events: none;
   }
   .card-icon-wrap svg {
@@ -198,6 +203,31 @@
     margin-bottom: 0.8rem;
   }
   .card.is-game .card-tag { color: var(--amber); }
+  .card.is-bloom .card-tag { color: var(--sage); }
+  .card.is-bloom:focus-visible { outline-color: var(--sage); }
+  .card.is-bloom .card-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .card-new-badge {
+    display: inline-flex;
+    align-items: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--sage);
+    background: rgba(59,107,80,0.12);
+    border: 1px solid rgba(59,107,80,0.28);
+    border-radius: 100px;
+    padding: 2px 8px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  @media (prefers-color-scheme: dark) {
+    .card-new-badge { background: rgba(111,176,136,0.14); border-color: rgba(111,176,136,0.32); }
+  }
 
   .card h2 {
     font-family: 'Playfair Display', serif;
@@ -327,14 +357,39 @@
 <main class="page">
 
   <header>
-    <div class="kicker">DSA · Computational Geometry · Read & Play</div>
+    <div class="kicker">Notes on Algorithms · Geometry · Data Structures</div>
     <h1>Paper Cuts <span class="snip" aria-hidden="true">✂</span></h1>
-    <p class="subtitle">A deceptively simple problem about cutting a page into pieces — that opens into surprisingly deep design questions. Read the essay, then play the game.</p>
+    <p class="subtitle">A small collection of writings about the algorithms and data structures that quietly hold software up. Each piece is a deep dive — read it, then play with it.</p>
   </header>
 
   <section class="card-grid" aria-label="Choose your path">
 
-    <a class="card is-blog" href="blog.html" aria-label="Read the essay — about 10 minute read">
+    <a class="card is-bloom" href="bloom-filters.html" aria-label="Read about bloom filters — interactive deep dive, ~30 minute read">
+      <div class="card-icon-wrap" aria-hidden="true">
+        <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="30" cy="30" r="6" fill="currentColor" stroke="none"/>
+          <circle cx="50" cy="30" r="6" fill="none"/>
+          <circle cx="70" cy="30" r="6" fill="currentColor" stroke="none"/>
+          <circle cx="30" cy="50" r="6" fill="none"/>
+          <circle cx="50" cy="50" r="6" fill="currentColor" stroke="none"/>
+          <circle cx="70" cy="50" r="6" fill="none"/>
+          <circle cx="30" cy="70" r="6" fill="currentColor" stroke="none"/>
+          <circle cx="50" cy="70" r="6" fill="none"/>
+          <circle cx="70" cy="70" r="6" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-tag"><span class="card-new-badge">new</span><span>Probabilistic DSA</span></div>
+      <h2>Bloom Filters</h2>
+      <p>A data structure that sometimes lies — and why that's perfectly fine. From the math (FPR derivation, optimal k) to the variants (counting, scalable, cuckoo, rotating) to the production patterns. Every concept has an interactive demo.</p>
+      <div class="card-meta">
+        <span class="meta-item">~30 min read</span>
+        <span class="meta-sep">·</span>
+        <span class="meta-item">13 demos</span>
+        <span class="card-arrow" aria-hidden="true">→</span>
+      </div>
+    </a>
+
+    <a class="card is-blog" href="blog.html" aria-label="Read the paper cuts essay — about 10 minute read">
       <div class="card-icon-wrap" aria-hidden="true">
         <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6">
           <rect x="22" y="14" width="56" height="72" rx="2" stroke="currentColor"/>
@@ -345,8 +400,8 @@
           <line x1="32" y1="70" x2="50" y2="70" stroke="currentColor" stroke-opacity="0.7"/>
         </svg>
       </div>
-      <div class="card-tag">The Essay</div>
-      <h2>Read the article</h2>
+      <div class="card-tag">Computational Geometry</div>
+      <h2>Paper Cuts</h2>
       <p>A walk through the problem space. Why "cut a page into pieces" turns into 11 design questions about PSLG, DCEL, T-junctions, and degenerate intersections — long before you write a single line of code.</p>
       <div class="card-meta">
         <span class="meta-item">~10 min read</span>
@@ -356,7 +411,7 @@
       </div>
     </a>
 
-    <a class="card is-game" href="game.html" aria-label="Play the game — interactive paper cutting tool">
+    <a class="card is-game" href="game.html" aria-label="Play the paper cuts game — interactive paper cutting tool">
       <div class="card-icon-wrap" aria-hidden="true">
         <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6">
           <rect x="18" y="18" width="64" height="64" rx="2" stroke="currentColor"/>
@@ -367,8 +422,8 @@
         </svg>
       </div>
       <div class="card-tag">The Playground</div>
-      <h2>Play the game</h2>
-      <p>Click two points on a page and a cut appears between them. Snap to edges, scatter the pieces, see the regions emerge. The same geometry the essay describes — but where you can actually feel it.</p>
+      <h2>Cuts, the Game</h2>
+      <p>Click two points on a page and a cut appears between them. Snap to edges, scatter the pieces, see the regions emerge — the geometry from the essay where you can actually feel it.</p>
       <div class="card-meta">
         <span class="meta-item">interactive</span>
         <span class="meta-sep">·</span>
@@ -382,15 +437,15 @@
   <section class="outline" aria-label="Why this exists">
     <div>
       <h3>The Idea</h3>
-      <p>Take a unit square. Make a few straight cuts. How many regions did you just create? The answer involves planar straight-line graphs and a forest of design choices most tutorials skip.</p>
+      <p>One topic at a time, taken seriously. The kind of writing that makes you understand the thing — not just recognise its name. Math derived from scratch, code under 100 lines, demos you can break in your browser.</p>
     </div>
     <div>
-      <h3>Read First, Play Second</h3>
-      <p>The essay names the problem and surfaces the questions. The game lets you trip over them yourself. Either order works — the playground is forgiving, the essay is opinionated.</p>
+      <h3>The Method</h3>
+      <p>Read the article; play with the demos as you go. Every interactive is a falsifiable claim — type something, watch the system either hold up or break. Code that ships in production lives on companion pages.</p>
     </div>
     <div>
       <h3>Open</h3>
-      <p>This is a thinking-out-loud project. Counterexamples, suggestions, and arguments about T-junctions all welcome. Reach me on Twitter — link below.</p>
+      <p>Counterexamples, suggestions, and arguments all welcome. These are working notes, not finished products — corrections improve them. Reach me on Twitter — link below.</p>
     </div>
   </section>
 
