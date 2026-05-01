@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,200&family=Lora:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
 <style>
 :root{
+  color-scheme: light;
   --bg:#F6F2EB;--sur:#EDE8DE;--sur2:#E3DDD2;
   --tx:#1D1C19;--txm:#7A776E;
   --ac:#3B6B50;--acm:#4E8A68;--acg:rgba(59,107,80,.18);
@@ -18,18 +19,7 @@
   --pre-bg:#1A2420;--pre-fg:#A9D8B8;
   --grid-line:#CEC9BC;--axis-text:#9A9790;
 }
-@media(prefers-color-scheme:dark){
-  :root{
-    --bg:#14110e;--sur:#1f1b16;--sur2:#26221c;
-    --tx:#ece6db;--txm:#a89f90;
-    --ac:#6FB088;--acm:#85C39C;--acg:rgba(111,176,136,.22);
-    --am:#DBA84E;--amg:rgba(219,168,78,.22);
-    --rd:#E87060;--off:#3a3530;--bdr:#3a3530;
-    --bl:#7AA9D4;--pu:#A283D0;
-    --pre-bg:#0d0b09;--pre-fg:#A9D8B8;
-    --grid-line:#3a3530;--axis-text:#7a7268;
-  }
-}
+/* light only — author preference; no prefers-color-scheme:dark override */
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
 body{background:var(--bg);color:var(--tx);font-family:'Lora',Georgia,serif;font-size:18px;line-height:1.82;}
