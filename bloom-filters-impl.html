@@ -696,9 +696,9 @@ footer a:hover{border-color:var(--ac);}
 <span class="kw">const</span> r = measureFPR(BloomFilter, <span class="nm">10000</span>, <span class="nm">0.01</span>);
 console.log(<span class="st">`measured ${(r.measured*100).toFixed(3)}% vs ${(r.theoretical*100).toFixed(3)}% (ratio ${r.ratio.toFixed(2)}) — ${r.pass ? 'PASS' : 'FAIL'}`</span>);</code></pre>
 <div class="run-demo">
-  <div class="dt">✦ Run all filter types side-by-side</div>
+  <div class="dt">✦ Run all six filter types side-by-side</div>
   <button onclick="runAll()">Compare all implementations</button>
-  <div class="run-out" id="out-all">Click to insert 5,000 items into Standard, Counting, Scalable, Partitioned, and Cuckoo. Reports measured vs theoretical FPR for each.</div>
+  <div class="run-out" id="out-all">Click to benchmark Standard, Counting, Partitioned, Scalable, Cuckoo, and Rotating filters. 5,000 items inserted and 50,000 absent items queried. Reports measured FPR vs the 1.00% theoretical target plus runtime.</div>
 </div>
 </section>
 
@@ -807,6 +807,86 @@ class ScalableBloomFilter {
   }
 }
 
+class PartitionedBloomFilter {
+  constructor(n, p = 0.01) {
+    const ln2 = Math.LN2;
+    const totalM = Math.ceil(-n * Math.log(p) / (ln2*ln2));
+    this.k = Math.max(1, Math.round(totalM/n*ln2));
+    this.partM = Math.ceil(totalM / this.k);
+    this.m = this.partM * this.k;
+    this.partitions = Array.from({length:this.k}, () => new Uint8Array(Math.ceil(this.partM/8)));
+  }
+  _seedFor(i) { return 0x9747b28c ^ (i * 0x9e3779b9); }
+  add(item) {
+    const s = String(item);
+    for (let i = 0; i < this.k; i++) {
+      const pos = murmur3(s, this._seedFor(i)) % this.partM;
+      this.partitions[i][pos>>>3] |= (1 << (pos & 7));
+    }
+  }
+  has(item) {
+    const s = String(item);
+    for (let i = 0; i < this.k; i++) {
+      const pos = murmur3(s, this._seedFor(i)) % this.partM;
+      if ((this.partitions[i][pos>>>3] & (1 << (pos & 7))) === 0) return false;
+    }
+    return true;
+  }
+}
+
+class CuckooFilter {
+  constructor(capacity, bucketSize = 4, fpSize = 8, maxKicks = 500) {
+    this.numBuckets = 1; while (this.numBuckets < capacity / bucketSize) this.numBuckets <<= 1;
+    this.bucketSize = bucketSize; this.fpMask = (1 << fpSize) - 1; this.maxKicks = maxKicks;
+    this.buckets = Array.from({length:this.numBuckets}, () => new Array(bucketSize).fill(0));
+    this.size = 0;
+  }
+  _fp(item) { return (murmur3(String(item), 0xfee1) & this.fpMask) || 1; }
+  _i1(item) { return murmur3(String(item), 0xbeef) % this.numBuckets; }
+  _alt(i, fp) { return ((i ^ murmur3(String(fp), 0xcafe)) >>> 0) % this.numBuckets; }
+  _slot(i, val) {
+    const b = this.buckets[i];
+    for (let s = 0; s < this.bucketSize; s++) if (b[s] === val) return s;
+    return -1;
+  }
+  add(item) {
+    const fp = this._fp(item);
+    let i = this._i1(item);
+    for (const idx of [i, this._alt(i, fp)]) {
+      const s = this._slot(idx, 0);
+      if (s !== -1) { this.buckets[idx][s] = fp; this.size++; return true; }
+    }
+    let cur = fp, ci = Math.random() < 0.5 ? i : this._alt(i, fp);
+    for (let n = 0; n < this.maxKicks; n++) {
+      const s = Math.floor(Math.random() * this.bucketSize);
+      [cur, this.buckets[ci][s]] = [this.buckets[ci][s], cur];
+      ci = this._alt(ci, cur);
+      const empty = this._slot(ci, 0);
+      if (empty !== -1) { this.buckets[ci][empty] = cur; this.size++; return true; }
+    }
+    return false;
+  }
+  has(item) {
+    const fp = this._fp(item);
+    const i = this._i1(item);
+    return this._slot(i, fp) !== -1 || this._slot(this._alt(i, fp), fp) !== -1;
+  }
+}
+
+class RotatingBloomFilter {
+  constructor(n, p = 0.01, windows = 2) {
+    this.n = n; this.p = p; this.windows = windows;
+    this.filters = Array.from({length: windows}, () => new BloomFilter(n, p));
+    this.active = 0;
+  }
+  add(item) { this.filters[this.active].add(item); }
+  has(item) { for (const f of this.filters) if (f.has(item)) return true; return false; }
+  rotate() {
+    this.active = (this.active + 1) % this.windows;
+    this.filters[this.active] = new BloomFilter(this.n, this.p);
+  }
+}
+
 function runStandard() {
   const out = document.getElementById('out-standard');
   out.textContent = 'Running…';
@@ -831,11 +911,9 @@ function runAll() {
   setTimeout(() => {
     const N = 5000, p = 0.01, samples = 50000;
     const lines = [];
-    const types = [
-      ['Standard',    BloomFilter],
-      ['Counting',    CountingBloomFilter],
-    ];
-    for (const [name, C] of types) {
+    const pad = (s, n) => s.padEnd(n);
+
+    const runFixed = (name, C) => {
       const t0 = performance.now();
       const bf = new C(N, p);
       for (let i = 0; i < N; i++) bf.add('item:'+i);
@@ -844,17 +922,47 @@ function runAll() {
       const t = performance.now()-t0;
       const m = (fp/samples*100).toFixed(2);
       const ratio = (fp/samples / p).toFixed(2);
-      lines.push(`${name.padEnd(11)}  measured ${m}%  (theoretical 1.00%, ratio ×${ratio})  ${t.toFixed(0)}ms`);
+      lines.push(`${pad(name,12)} fpr=${m}%  ratio=×${ratio}  ${t.toFixed(0)}ms`);
+    };
+
+    runFixed('Standard',    BloomFilter);
+    runFixed('Counting',    CountingBloomFilter);
+    runFixed('Partitioned', PartitionedBloomFilter);
+
+    {
+      const t0 = performance.now();
+      const sbf = new ScalableBloomFilter(500, p);
+      for (let i = 0; i < N; i++) sbf.add('item:'+i);
+      let fp = 0;
+      for (let i = 0; i < samples; i++) if (sbf.has('notitem:'+i)) fp++;
+      const t = performance.now()-t0;
+      const m = (fp/samples*100).toFixed(2);
+      lines.push(`${pad('Scalable',12)} fpr=${m}%  (${sbf.filters.length} sub-filters)  ${t.toFixed(0)}ms`);
     }
-    // ScalableBloomFilter — created without an n; insert progressively
-    const t0 = performance.now();
-    const sbf = new ScalableBloomFilter(500, p);
-    for (let i = 0; i < N; i++) sbf.add('item:'+i);
-    let fp = 0;
-    for (let i = 0; i < samples; i++) if (sbf.has('notitem:'+i)) fp++;
-    const t = performance.now()-t0;
-    const m = (fp/samples*100).toFixed(2);
-    lines.push(`Scalable     measured ${m}%  (${sbf.filters.length} sub-filters)  ${t.toFixed(0)}ms`);
+
+    {
+      const t0 = performance.now();
+      const cf = new CuckooFilter(N * 2);
+      let inserted = 0;
+      for (let i = 0; i < N; i++) if (cf.add('item:'+i)) inserted++;
+      let fp = 0;
+      for (let i = 0; i < samples; i++) if (cf.has('notitem:'+i)) fp++;
+      const t = performance.now()-t0;
+      const m = (fp/samples*100).toFixed(2);
+      lines.push(`${pad('Cuckoo',12)} fpr=${m}%  ${inserted}/${N} inserted  ${t.toFixed(0)}ms`);
+    }
+
+    {
+      const t0 = performance.now();
+      const rbf = new RotatingBloomFilter(N, p, 2);
+      for (let i = 0; i < N; i++) rbf.add('item:'+i);
+      let fp = 0;
+      for (let i = 0; i < samples; i++) if (rbf.has('notitem:'+i)) fp++;
+      const t = performance.now()-t0;
+      const m = (fp/samples*100).toFixed(2);
+      lines.push(`${pad('Rotating',12)} fpr=${m}%  (2 windows live)  ${t.toFixed(0)}ms`);
+    }
+
     out.textContent = lines.join('\n');
   }, 30);
 }
